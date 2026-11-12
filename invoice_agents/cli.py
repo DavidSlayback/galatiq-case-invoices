@@ -8,6 +8,7 @@ import typer
 from rich.console import Console
 
 from invoice_agents import settings as settings_mod
+from invoice_agents.seed import reset as reset_db
 
 app = typer.Typer(no_args_is_help=False, add_completion=False, help="Acme invoice processing agents.")
 console = Console()
@@ -92,7 +93,9 @@ def review() -> None:
 @app.command()
 def reset(db: DbOpt = None) -> None:
     """Recreate and seed the database."""
-    _not_yet()
+    s = build_settings(None, False, None, db)
+    reset_db(s.db_path).close()
+    console.print(f"[green]Reset[/green] {s.db_path}: inventory, vendors and FX rates seeded.")
 
 
 @app.command()

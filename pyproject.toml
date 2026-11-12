@@ -40,7 +40,7 @@ convention = "google"
 "tests/**" = ["D"]
 
 [tool.pyright]
-include = ["invoice_agents", "main.py", "tests", "app"]
+include = ["invoice_agents", "main.py", "tests"]
 pythonVersion = "3.14"
 typeCheckingMode = "strict"
 reportMissingTypeStubs = false
