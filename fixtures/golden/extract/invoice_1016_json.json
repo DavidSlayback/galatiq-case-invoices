@@ -5,43 +5,35 @@
     "vendor": "Widgets Inc.",
     "vendor_address": "100 Main St, Chicago, IL 60601",
     "invoice_number": "INV-1016",
-    "revision": 0,
     "invoice_date": "2026-01-27",
     "due_date": "2026-02-27",
     "currency": "USD",
     "lines": [
       {
-        "item_raw": "WidgetA",
-        "sku": "WidgetA",
+        "item": "WidgetA",
         "quantity": "4",
         "unit_price": "250.00",
-        "amount": "1000.00"
+        "amount": "1000.00",
+        "note": null
       },
       {
-        "item_raw": "WidgetB",
-        "sku": "WidgetB",
+        "item": "WidgetB",
         "quantity": "2",
         "unit_price": "500.00",
-        "amount": "1000.00"
+        "amount": "1000.00",
+        "note": null
       },
       {
-        "item_raw": "WidgetC",
-        "sku": null,
+        "item": "WidgetC",
         "quantity": "3",
         "unit_price": "350.00",
-        "amount": "1050.00"
+        "amount": "1050.00",
+        "note": null
       }
     ],
     "subtotal": "3050.00",
     "tax": "183.00",
     "total": "3233.00",
-    "payment_terms": "Net 30",
-    "provenance": {
-      "vendor": "llm",
-      "invoice_number": "llm",
-      "lines": "llm",
-      "total": "llm",
-      "shipping": "missing"
-    }
+    "payment_terms": "Net 30"
   }
 }

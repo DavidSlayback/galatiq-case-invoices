@@ -12,7 +12,7 @@ Code: [invoice_agents/rules.py](../invoice_agents/rules.py). `ARITHMETIC_MISMATC
 | Rule | Severity | Fires when | Why | Sample |
 |---|---|---|---|---|
 | `LOAD_FAILED` | hard | The file is unreadable, empty, malformed or of an unsupported type | Nothing to process | — |
-| `ARITHMETIC_MISMATCH` | hard | Stated figures disagree after 2 re-extractions (qty × price, line sum, subtotal + tax + shipping = total) | Totals must be internally consistent before money moves (D14) | 1007, 1009 |
+| `ARITHMETIC_MISMATCH` | hard | Stated figures disagree after 2 re-extractions (qty × price, line sum, subtotal + tax + shipping = total) | Totals must be internally consistent before money moves (D14, D30) | 1007, 1009, 1013 |
 | `UNKNOWN_ITEM` | hard | A line doesn't map to an inventory SKU | Can't receive goods we don't stock | 1008, 1016 |
 | `ZERO_STOCK_ITEM` | hard | A SKU carried at zero stock is invoiced | FakeItem is a planted fraud item | 1003 |
 | `STOCK_EXCEEDED` | hard | **Summed** quantity per SKU exceeds stock | Literal stock check (D1); 1013 hides the overrun across split lines | 1002, 1005, 1007, 1013 |

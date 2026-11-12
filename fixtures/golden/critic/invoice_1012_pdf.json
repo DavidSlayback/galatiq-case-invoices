@@ -1,0 +1,19 @@
+{
+  "source": "data/invoices/invoice_1012.pdf",
+  "file_sha256": "c20e713fe9e64c90b75b8ac4f38b12c719768c38e86428481e8bec6183035d43",
+  "attempts": [
+    {
+      "agrees": false,
+      "objections": [
+        "The vendor name is not in the registry; the rename claim comes only from the invoice itself and is unverified.",
+        "The total sits $25 under the auto-approval limit."
+      ]
+    },
+    {
+      "agrees": false,
+      "objections": [
+        "Paying a renamed payee on the invoice's own say-so is a known fraud pattern; remit-to details must be confirmed with FastShip through a known contact before payment."
+      ]
+    }
+  ]
+}

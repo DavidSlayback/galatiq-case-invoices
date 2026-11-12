@@ -4,4 +4,5 @@ set -euo pipefail
 uv run ruff check .
 uv run ruff format --check .
 uv run pyright
+uv run python scripts/stamp_goldens.py --check
 uv run pytest -q

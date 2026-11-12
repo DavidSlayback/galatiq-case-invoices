@@ -1,0 +1,21 @@
+{
+  "source": "data/invoices/invoice_1002.txt",
+  "file_sha256": "c08f8f1d07aa17791fff4b7b25706b011ed230994b9f9058df75f9ef24f9dbd4",
+  "output": {
+    "vendor": "Gadgets Co.",
+    "invoice_number": "1002",
+    "invoice_date": "Jan 30 2026",
+    "due_date": "2026-01-30",
+    "lines": [
+      {
+        "item": "GadgetX",
+        "quantity": "20",
+        "unit_price": "$750",
+        "amount": null,
+        "note": null
+      }
+    ],
+    "total": "$15,000.00",
+    "payment_terms": "Net 30"
+  }
+}

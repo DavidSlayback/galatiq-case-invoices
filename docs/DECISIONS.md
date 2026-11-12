@@ -56,7 +56,7 @@ Decisions from the grilling session on 2026-11-12. Each one comes from David unl
 | D27 | Boundaries: NEAR_THRESHOLD is 9,500 ≤ total < 10,000. VP is 10,000 ≤ total ≤ 50,000; human is > 50,000. PAST_DUE is due < as_of. DUE_BEFORE_INVOICE is due ≤ invoice date. UNKNOWN_VENDOR alone is soft; with urgency or wire language it becomes the fraud rule UNKNOWN_VENDOR_PRESSURE (D10 as written). | Removes ambiguity at the edges. |
 | D28 | Fixed VP-tier outcomes for the eval: 1001 approve, 1010 approve, 1012 VP approve then critic objects twice → inbox. | Stops the eval from being circular; gives the inbox a natural sample. |
 | D29 | Payments go out in the invoice currency (1014: EUR 4,125.00) with the USD equivalent recorded (4,455.00); tiers and price rules use USD. | The mock_payment signature has no currency field. |
-| D30 | INV-1007 also has a stated-total error (14,750 + 885 = 15,635, not 15,525); its expected outcome requires ARITHMETIC_MISMATCH. | The PRD missed it; a fresh-context review found it. |
+| D30 | Two invoices state a wrong total, and both expected outcomes require ARITHMETIC_MISMATCH. INV-1007: 14,750 + 885 = 15,635, not 15,525. INV-1013: 21,040.00 + 1,472.80 = 22,512.80, not 22,562.80 ($50 over). | The PRD missed both. A fresh-context review found 1007; the reconcile step found 1013 on its first run. |
 
 ## Model backends (David, 2026-11-12)
 

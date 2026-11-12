@@ -1,0 +1,15 @@
+{
+  "source": "data/invoices/invoice_1001.txt",
+  "file_sha256": "7308ab3d7ff26ee338e16ba304e762f0ac90403958d6211cfab36c94eb14dfd1",
+  "attempts": [
+    {
+      "decision": "approve",
+      "reasons": [
+        "Due date is two days later than Net 15 implies; a later due date favours Acme and the goods and prices match the catalog."
+      ],
+      "cited_rule_ids": [
+        "DUE_TERMS_MISMATCH"
+      ]
+    }
+  ]
+}

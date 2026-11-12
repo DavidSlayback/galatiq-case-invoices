@@ -1,0 +1,36 @@
+{
+  "source": "data/invoices/invoice_1015.csv",
+  "file_sha256": "6cbed47ed55eabedc5aab7d22c8a6e6f067baa5addb96969ab58fe118fcaf7e2",
+  "output": {
+    "vendor": "Reliable Components Inc.",
+    "invoice_number": "INV-1015",
+    "invoice_date": "2026-01-29",
+    "due_date": "2026-02-28",
+    "lines": [
+      {
+        "item": "WidgetA",
+        "quantity": "10",
+        "unit_price": "250.00",
+        "amount": "2500.00",
+        "note": null
+      },
+      {
+        "item": "WidgetB",
+        "quantity": "5",
+        "unit_price": "500.00",
+        "amount": "2500.00",
+        "note": null
+      },
+      {
+        "item": "GadgetX",
+        "quantity": "2",
+        "unit_price": "750.00",
+        "amount": "1500.00",
+        "note": null
+      }
+    ],
+    "subtotal": "6500.00",
+    "tax": "0.00",
+    "total": "6500.00"
+  }
+}

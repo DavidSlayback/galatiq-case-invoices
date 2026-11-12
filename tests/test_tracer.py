@@ -46,7 +46,7 @@ def test_reconcile_retries_then_accepts(
     conn: sqlite3.Connection, offline: Settings, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
     """A wrong total twice, then a right one: three extractor calls, no finding."""
-    golden = json.loads((ROOT / "fixtures/golden/extract/invoice_1004.json").read_text())
+    golden = json.loads((ROOT / "fixtures/golden/extract/invoice_1004_json.json").read_text())
     bad = {**golden["output"], "total": "9999.00"}
     golden["attempts"] = [bad, bad, golden["output"]]
     (tmp_path / "extract").mkdir()

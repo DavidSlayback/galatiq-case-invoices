@@ -1,0 +1,27 @@
+{
+  "source": "data/invoices/invoice_1008.txt",
+  "file_sha256": "a72eaf616b0f9fdba3266371bc21b77664ee5627511dd98c976329cb9c906a12",
+  "output": {
+    "vendor": "NoProd Industries",
+    "invoice_number": "INV-1008",
+    "invoice_date": "2026-01-10",
+    "due_date": "2026-01-20",
+    "lines": [
+      {
+        "item": "SuperGizmo",
+        "quantity": "12",
+        "unit_price": "$400.00",
+        "amount": null,
+        "note": null
+      },
+      {
+        "item": "MegaSprocket",
+        "quantity": "6",
+        "unit_price": "$850.00",
+        "amount": null,
+        "note": null
+      }
+    ],
+    "total": "$9,900.00"
+  }
+}

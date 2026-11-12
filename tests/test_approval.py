@@ -60,9 +60,9 @@ def test_guard_blocks_approval_with_hard_findings():
 # --- the loop, end to end, with scripted reviewers -------------------------
 
 LINES = [
-    {"item_raw": "WidgetA", "sku": "WidgetA", "quantity": "15", "unit_price": "250.00"},
-    {"item_raw": "WidgetB", "sku": "WidgetB", "quantity": "10", "unit_price": "500.00"},
-    {"item_raw": "GadgetX", "sku": "GadgetX", "quantity": "5", "unit_price": "750.00"},
+    {"item": "WidgetA", "quantity": "15", "unit_price": "250.00"},
+    {"item": "WidgetB", "quantity": "10", "unit_price": "500.00"},
+    {"item": "GadgetX", "quantity": "5", "unit_price": "750.00"},
 ]
 SRC = INVOICES / "invoice_1004.json"
 
@@ -74,7 +74,7 @@ def approve(*ids: str) -> dict[str, Any]:
 @pytest.fixture
 def goldens(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Any]:
     """Point offline replay at a temp dir; returns a writer for vp/critic scripts."""
-    base = json.loads((ROOT / "fixtures/golden/extract/invoice_1004.json").read_text())
+    base = json.loads((ROOT / "fixtures/golden/extract/invoice_1004_json.json").read_text())
     base["output"] |= {"lines": LINES, "subtotal": "12500.00", "tax": "0", "total": "12500.00"}
     gdir = tmp_path / "golden"
     for kind in ("extract", "vp", "critic"):

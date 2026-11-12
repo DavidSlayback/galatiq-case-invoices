@@ -1,0 +1,26 @@
+{
+  "source": "data/invoices/invoice_1012.pdf",
+  "file_sha256": "c20e713fe9e64c90b75b8ac4f38b12c719768c38e86428481e8bec6183035d43",
+  "attempts": [
+    {
+      "decision": "approve",
+      "reasons": [
+        "QuickShip states it was formerly FastShip Ltd., a known vendor, and quotes PO-20260115; prices match the catalog."
+      ],
+      "cited_rule_ids": [
+        "UNKNOWN_VENDOR",
+        "NEAR_THRESHOLD"
+      ]
+    },
+    {
+      "decision": "approve",
+      "reasons": [
+        "The rename note and PO reference are consistent with the FastShip relationship; the total is under the limit."
+      ],
+      "cited_rule_ids": [
+        "UNKNOWN_VENDOR",
+        "NEAR_THRESHOLD"
+      ]
+    }
+  ]
+}
