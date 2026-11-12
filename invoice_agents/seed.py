@@ -46,6 +46,13 @@ def seed(conn: sqlite3.Connection) -> None:
         conn.executemany("INSERT OR REPLACE INTO fx_rates VALUES (?, ?, ?, ?)", FX_RATES)
 
 
+def open_db(path: Path) -> sqlite3.Connection:
+    """Open the database, seeding it first if it does not exist yet."""
+    if not path.exists():
+        return reset(path)
+    return connect(path)
+
+
 def reset(path: Path) -> sqlite3.Connection:
     """Delete the database (and WAL files), recreate the schema and seed it."""
     for suffix in ("", "-wal", "-shm"):

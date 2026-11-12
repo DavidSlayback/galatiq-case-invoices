@@ -1,0 +1,41 @@
+---
+title: Invoice processing
+---
+stateDiagram-v2
+  load_file
+  state decision <<choice>>
+  extract
+  load_failed
+  reconcile_step
+  state decision_2 <<choice>>
+  retry
+  validate
+  state decision_3 <<choice>>
+  escalate
+  pay
+  reject
+  vp_review
+  state decision_4 <<choice>>
+
+  [*] --> load_file
+  load_file --> decision
+  decision --> extract
+  decision --> load_failed
+  extract --> reconcile_step
+  load_failed --> [*]
+  reconcile_step --> decision_2
+  decision_2 --> retry
+  decision_2 --> validate
+  retry --> extract
+  validate --> decision_3
+  decision_3 --> escalate
+  decision_3 --> pay
+  decision_3 --> reject
+  decision_3 --> vp_review
+  escalate --> [*]
+  pay --> [*]
+  reject --> [*]
+  vp_review --> decision_4
+  decision_4 --> escalate
+  decision_4 --> pay
+  decision_4 --> reject

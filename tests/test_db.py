@@ -46,9 +46,7 @@ def test_events_are_append_only(conn: sqlite3.Connection):
 
 def test_record_is_atomic(conn: sqlite3.Connection):
     with pytest.raises(sqlite3.OperationalError):
-        db.record(
-            conn, KEY, EventType.RECEIVED, actor="t", run_id="r1", status=Status.RECEIVED, no_such_column=1
-        )
+        db.record(conn, KEY, EventType.RECEIVED, actor="t", run_id="r1", status=Status.RECEIVED, no_such_column=1)
     assert conn.execute("SELECT count(*) FROM invoice_events").fetchone()[0] == 0
 
 

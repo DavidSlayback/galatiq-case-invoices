@@ -7,7 +7,11 @@ from typing import Annotated
 import typer
 from rich.console import Console
 
+from invoice_agents import graph
 from invoice_agents import settings as settings_mod
+from invoice_agents.agents.offline import MissingFixture
+from invoice_agents.report import outcome_panel
+from invoice_agents.seed import open_db
 from invoice_agents.seed import reset as reset_db
 
 app = typer.Typer(no_args_is_help=False, add_completion=False, help="Acme invoice processing agents.")
@@ -22,9 +26,7 @@ AsOfOpt = Annotated[str | None, typer.Option("--as-of", help="Processing date (Y
 DbOpt = Annotated[Path | None, typer.Option("--db", help="SQLite database path.")]
 
 
-def build_settings(
-    model: str | None, offline: bool, as_of: str | None, db: Path | None
-) -> settings_mod.Settings:
+def build_settings(model: str | None, offline: bool, as_of: str | None, db: Path | None) -> settings_mod.Settings:
     """Merge environment settings with CLI overrides."""
     return settings_mod.from_env().with_overrides(
         model=model,
@@ -68,8 +70,14 @@ def process(
     db: DbOpt = None,
 ) -> None:
     """Run one invoice through ingestion, validation, approval and payment."""
-    build_settings(model, offline, as_of, db)
-    _not_yet()
+    s = build_settings(model, offline, as_of, db)
+    conn = open_db(s.db_path)
+    try:
+        outcome = graph.process_sync(invoice_path, s, conn)
+    except MissingFixture as e:
+        console.print(f"[red]Offline mode has no recorded answer for this file:[/red] {e}")
+        raise typer.Exit(2) from e
+    console.print(outcome_panel(outcome))
 
 
 @app.command("eval")

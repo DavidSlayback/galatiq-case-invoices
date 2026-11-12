@@ -157,4 +157,6 @@ class Outcome(BaseModel):
     decision: Decision | None = None
     findings: list[Finding] = Field(default_factory=list)
     run_id: str
+    invoice: Invoice | None = None
     amount_paid: Decimal | None = None
+    source_path: str | None = None

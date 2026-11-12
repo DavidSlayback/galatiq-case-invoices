@@ -53,7 +53,8 @@ def now() -> str:
     return datetime.now(UTC).isoformat(timespec="milliseconds")
 
 
-def _json(obj: Any) -> str:
+def json_dumps(obj: Any) -> str:
+    """Stable JSON for payload columns (Decimal and dates as strings)."""
     return json.dumps(obj, default=str, sort_keys=True)
 
 
@@ -112,7 +113,7 @@ def _record(
     conn.execute(
         "INSERT INTO invoice_events (ts, run_id, vendor, invoice_number, revision, event, actor, payload)"
         " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-        (ts, run_id, key.vendor, key.invoice_number, key.revision, event, actor, _json(payload or {})),
+        (ts, run_id, key.vendor, key.invoice_number, key.revision, event, actor, json_dumps(payload or {})),
     )
     if status is not None:
         fields = {k: (str(v) if isinstance(v, Decimal) else v) for k, v in invoice_fields.items()}

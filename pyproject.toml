@@ -25,7 +25,7 @@ dev = [
 ]
 
 [tool.ruff]
-line-length = 110
+line-length = 120
 target-version = "py314"
 extend-exclude = ["data/generate_pdfs.py", "*.md"]
 
