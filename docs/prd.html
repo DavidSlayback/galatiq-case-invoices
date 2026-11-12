@@ -1,0 +1,244 @@
+<title>Acme Invoice Agents PRD</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Archivo:wght@600;700&display=swap">
+<style>
+/* Layout: one 960px reading column styled like an AP ledger. Requirement tables, then the per-invoice matrix, then brainstorm question cards. */
+:root{
+  --bg:#f5f7f9; --surface:#ffffff; --fg:#17202a; --muted:#5b6876; --rule:#d9e0e7;
+  --accent:#1f5fa8; --accent-soft:#e3edf8;
+  --ok:#1e7a4c; --ok-soft:#e1f2e8; --warn:#9a6200; --warn-soft:#fbf0d9; --bad:#b0302b; --bad-soft:#f8e3e1;
+  --display:"Archivo","Helvetica Neue",Arial,sans-serif;
+  --body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#10151b; --surface:#171e26; --fg:#e4e9ef; --muted:#9aa7b4; --rule:#2a3440;
+  --accent:#7fb2ec; --accent-soft:#1c2b3d;
+  --ok:#6fcf9a; --ok-soft:#173326; --warn:#e7b65a; --warn-soft:#3a2d12; --bad:#f08a84; --bad-soft:#3d1c1b; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#10151b; --surface:#171e26; --fg:#e4e9ef; --muted:#9aa7b4; --rule:#2a3440;
+  --accent:#7fb2ec; --accent-soft:#1c2b3d;
+  --ok:#6fcf9a; --ok-soft:#173326; --warn:#e7b65a; --warn-soft:#3a2d12; --bad:#f08a84; --bad-soft:#3d1c1b; color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font:15px/1.6 var(--body)}
+.wrap{max-width:960px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:40px 64px;display:grid;gap:44px}
+h1,h2,h3{font-family:var(--display);text-wrap:balance;margin:0;line-height:1.2}
+h1{font-size:2rem;letter-spacing:-.01em}
+h2{font-size:1.35rem}
+h3{font-size:1rem}
+p{margin:0;max-width:68ch}
+.eyebrow{font:500 .72rem/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+header{display:grid;gap:14px;border-bottom:2px solid var(--fg);padding-bottom:22px}
+.meta{display:flex;flex-wrap:wrap;gap:8px 18px;font:400 .82rem var(--mono);color:var(--muted)}
+.meta b{color:var(--fg);font-weight:500}
+section{display:grid;gap:16px}
+.legend{display:flex;flex-wrap:wrap;gap:8px;font-size:.85rem;color:var(--muted);align-items:center}
+.tag{display:inline-block;font:500 .7rem/1 var(--mono);padding:4px 7px;border-radius:3px;white-space:nowrap;letter-spacing:.03em}
+.t-brief{background:var(--accent-soft);color:var(--accent)}
+.t-data{background:var(--warn-soft);color:var(--warn)}
+.t-inf{background:transparent;color:var(--muted);border:1px dashed var(--muted);padding:3px 6px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;background:var(--rule);border:1px solid var(--rule)}
+.stat{background:var(--surface);padding:14px 16px;display:grid;gap:2px}
+.stat .n{font:600 1.6rem var(--display);font-variant-numeric:tabular-nums}
+.stat .l{font-size:.8rem;color:var(--muted)}
+.problem{background:var(--surface);border-left:3px solid var(--accent);padding:16px 18px;display:grid;gap:10px}
+details{background:var(--surface);border:1px solid var(--rule);border-radius:4px}
+summary{cursor:pointer;padding:12px 16px;display:flex;gap:12px;align-items:baseline;list-style:none;font-weight:600}
+summary::-webkit-details-marker{display:none}
+summary::before{content:"+";font-family:var(--mono);color:var(--muted);width:1ch}
+details[open] summary::before{content:"−"}
+summary .count{margin-left:auto;font:400 .78rem var(--mono);color:var(--muted)}
+summary:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.tbl{overflow-x:auto;border-top:1px solid var(--rule)}
+table{border-collapse:collapse;width:100%;font-size:.88rem}
+th,td{text-align:left;vertical-align:top;padding:9px 14px;border-bottom:1px solid var(--rule)}
+th{font:500 .72rem var(--mono);text-transform:uppercase;letter-spacing:.08em;color:var(--muted);background:var(--bg)}
+tr:last-child td{border-bottom:0}
+td.id{font:500 .8rem var(--mono);white-space:nowrap;color:var(--accent)}
+td.src{white-space:nowrap}
+code{font:.85em var(--mono);background:var(--bg);padding:1px 4px;border-radius:2px}
+.inv td:first-child{font:500 .82rem var(--mono);white-space:nowrap;font-variant-numeric:tabular-nums}
+.fmt{font:.78rem var(--mono);color:var(--muted);white-space:nowrap}
+.out{display:inline-block;font:500 .74rem/1.3 var(--body);padding:3px 8px;border-radius:999px;white-space:nowrap}
+.o-ok{background:var(--ok-soft);color:var(--ok)}
+.o-esc{background:var(--warn-soft);color:var(--warn)}
+.o-rej{background:var(--bad-soft);color:var(--bad)}
+.o-dup{background:var(--accent-soft);color:var(--accent)}
+.note{font-size:.88rem;color:var(--muted);border-left:2px solid var(--rule);padding-left:12px}
+.groups{display:grid;gap:28px}
+.group{display:grid;gap:12px}
+.group h3{font:500 .78rem var(--mono);text-transform:uppercase;letter-spacing:.1em;color:var(--muted)}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
+.card{background:var(--surface);border:1px solid var(--rule);border-radius:4px;padding:14px 16px;display:grid;gap:8px;align-content:start;min-width:0}
+.card .k{font:500 .75rem var(--mono);color:var(--accent)}
+.card h4{margin:0;font:600 .98rem var(--body)}
+.card p{font-size:.88rem;color:var(--muted)}
+.card .rec{font-size:.82rem;color:var(--fg);border-top:1px dashed var(--rule);padding-top:8px}
+.card .rec b{font-family:var(--mono);font-weight:500;font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;color:var(--ok)}
+footer{font-size:.85rem;color:var(--muted);border-top:1px solid var(--rule);padding-top:16px}
+@media (max-width:560px){h1{font-size:1.6rem}th,td{padding:8px 10px}}
+@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto}}
+</style>
+
+<div class="wrap">
+<header>
+  <span class="eyebrow">Product requirements · draft for brainstorming</span>
+  <h1>Acme invoice processing agents</h1>
+  <p>A multi-agent prototype that reads messy invoices, checks them against inventory, simulates VP approval with a self-critique loop, and pays or logs a rejection. This page lists requirements only; the design is decided later.</p>
+  <div class="meta"><span>Source <b>README @ 2f15015</b></span><span>Inputs <b>22 sample files</b></span><span>Repo doc <b>docs/PRD.md</b></span></div>
+</header>
+
+<section>
+  <div class="stats">
+    <div class="stat"><span class="n">$2M</span><span class="l">lost each year to manual processing</span></div>
+    <div class="stat"><span class="n">30%</span><span class="l">error rate today</span></div>
+    <div class="stat"><span class="n">5 days</span><span class="l">from receipt to payment</span></div>
+    <div class="stat"><span class="n">$10K</span><span class="l">threshold for extra VP scrutiny</span></div>
+  </div>
+  <div class="problem">
+    <h2>Problem</h2>
+    <p>Invoices arrive by email as messy PDFs. Staff key in the data, check it against an inconsistent legacy inventory database, chase VP approval over email, and pay through a banking API. The prototype has to run locally, with every external service simulated.</p>
+  </div>
+  <div class="legend">Each requirement is tagged by where it comes from:
+    <span class="tag t-brief">brief</span> stated in the README
+    <span class="tag t-data">data</span> implied by the sample invoices
+    <span class="tag t-inf">inferred</span> needed for credibility, so a candidate to cut</div>
+</section>
+
+<section>
+  <h2>Functional requirements</h2>
+
+  <details open><summary>FR-1 · Ingestion<span class="count">8</span></summary><div class="tbl"><table>
+  <tr><th>ID</th><th>Requirement</th><th>Source</th></tr>
+  <tr><td class="id">FR-1.1</td><td>Extract vendor, invoice number, dates, line items, subtotal, tax, total, currency and terms into one typed schema</td><td class="src"><span class="tag t-brief">brief</span> <span class="tag t-data">data</span></td></tr>
+  <tr><td class="id">FR-1.2</td><td>Accept PDF, TXT, JSON, CSV (both the key-value layout and the one-row-per-line layout) and XML; one TXT is an email body (1008)</td><td class="src"><span class="tag t-brief">brief</span> <span class="tag t-data">data</span></td></tr>
+  <tr><td class="id">FR-1.3</td><td>Tolerate typos and OCR noise: <code>Vndr</code> and <code>INVOCE</code> (1002), <code>2O26</code> and <code>$3,500.O0</code> (1012), <code>Widget A</code></td><td class="src"><span class="tag t-brief">brief</span> <span class="tag t-data">data</span></td></tr>
+  <tr><td class="id">FR-1.4</td><td>Normalise four date styles; treat unparseable values (<code>yesterday</code> in 1003) as errors, not guesses</td><td class="src"><span class="tag t-data">data</span></td></tr>
+  <tr><td class="id">FR-1.5</td><td>Report missing fields explicitly and never invent a value (1009: empty vendor, null due date)</td><td class="src"><span class="tag t-brief">brief</span> <span class="tag t-data">data</span></td></tr>
+  <tr><td class="id">FR-1.6</td><td>Map item text to inventory SKUs (<code>WidgetA (rush order)</code> → <code>WidgetA</code>) and keep the raw text</td><td class="src"><span class="tag t-data">data</span></td></tr>
+  <tr><td class="id">FR-1.7</td><td>Give each field a confidence score or provenance, so later stages can tell a parse from a guess</td><td class="src"><span class="tag t-inf">inferred</span></td></tr>
+  <tr><td class="id">FR-1.8</td><td>Self-correct: reconcile the line totals, subtotal, tax and total, and re-extract or flag when they disagree</td><td class="src"><span class="tag t-brief">brief</span></td></tr>
+  </table></div></details>
+
+  <details open><summary>FR-2 · Validation<span class="count">13</span></summary><div class="tbl"><table>
+  <tr><th>ID</th><th>Requirement</th><th>Source</th></tr>
+  <tr><td class="id">FR-2.1</td><td>Create and seed SQLite inventory: WidgetA 15, WidgetB 10, GadgetX 5, FakeItem 0</td><td class="src"><span class="tag t-brief">brief</span></td></tr>
+  <tr><td class="id">FR-2.2</td><td>Flag a quantity above stock (1002: 20 × GadgetX against 5)</td><td class="src"><span class="tag t-brief">brief</span></td></tr>
+  <tr><td class="id">FR-2.3</td><td>Flag zero-stock or suspicious items (1003: FakeItem)</td><td class="src"><span class="tag t-brief">brief</span></td></tr>
+  <tr><td class="id">FR-2.4</td><td>Flag items missing from inventory (1008: SuperGizmo, MegaSprocket; 1016: WidgetC)</td><td class="src"><span class="tag t-brief">brief</span></td></tr>
+  <tr><td class="id">FR-2.5</td><td>Flag data-integrity errors: negative quantity, totals that disagree with the line items (1009)</td><td class="src"><span class="tag t-brief">brief</span> <span class="tag t-data">data</span></td></tr>
+  <tr><td class="id">FR-2.6</td><td>Add up all lines for the same SKU before checking stock. Every line of 1013 passes alone; the totals (22 / 18 / 9) do not</td><td class="src"><span class="tag t-data">data</span></td></tr>
+  <tr><td class="id">FR-2.7</td><td>Check the arithmetic: quantity × price, sum of lines, subtotal + tax + shipping = total (1010 has shipping)</td><td class="src"><span class="tag t-data">data</span></td></tr>
+  <tr><td class="id">FR-2.8</td><td>Flag unit prices that differ from the catalog: a rush premium (1010), volume discounts (1013), EUR prices (1014)</td><td class="src"><span class="tag t-data">data</span></td></tr>
+  <tr><td class="id">FR-2.9</td><td>Flag currencies other than USD (1014 is in EUR)</td><td class="src"><span class="tag t-data">data</span></td></tr>
+  <tr><td class="id">FR-2.10</td><td>Detect duplicates and revisions (1004 and its R1; PDF and TXT/JSON pairs for 1011–1013); never pay twice</td><td class="src"><span class="tag t-data">data</span></td></tr>
+  <tr><td class="id">FR-2.11</td><td>Flag date problems: past due, due on the invoice date, due date that disagrees with the terms (1001, 1002, 1008)</td><td class="src"><span class="tag t-data">data</span></td></tr>
+  <tr><td class="id">FR-2.12</td><td>Score vendor risk: unknown vendor, renamed vendor (1012), implausible address (1005), pressure language (1003)</td><td class="src"><span class="tag t-data">data</span></td></tr>
+  <tr><td class="id">FR-2.13</td><td>Catch the stock overruns the README's table leaves out: 1005, 1007 and 1013</td><td class="src"><span class="tag t-data">data</span></td></tr>
+  </table></div></details>
+
+  <details open><summary>FR-3 · Approval<span class="count">6</span></summary><div class="tbl"><table>
+  <tr><th>ID</th><th>Requirement</th><th>Source</th></tr>
+  <tr><td class="id">FR-3.1</td><td>Simulate a VP review that applies rules, for example extra scrutiny above $10K</td><td class="src"><span class="tag t-brief">brief</span></td></tr>
+  <tr><td class="id">FR-3.2</td><td>The LLM reasons toward approve or reject, then critiques its own decision before finalising it</td><td class="src"><span class="tag t-brief">brief</span></td></tr>
+  <tr><td class="id">FR-3.3</td><td>Base the decision on the validation findings and record which rules fired</td><td class="src"><span class="tag t-brief">brief</span> <span class="tag t-inf">inferred</span></td></tr>
+  <tr><td class="id">FR-3.4</td><td>Add "escalate to a human" alongside approve and reject</td><td class="src"><span class="tag t-inf">inferred</span></td></tr>
+  <tr><td class="id">FR-3.5</td><td>Treat totals just under the threshold as possible threshold-gaming ($9,975 and $9,900)</td><td class="src"><span class="tag t-data">data</span> <span class="tag t-inf">inferred</span></td></tr>
+  <tr><td class="id">FR-3.6</td><td>The LLM can never approve an invoice a hard rule rejected</td><td class="src"><span class="tag t-inf">inferred</span></td></tr>
+  </table></div></details>
+
+  <details><summary>FR-4 · Payment<span class="count">4</span></summary><div class="tbl"><table>
+  <tr><th>ID</th><th>Requirement</th><th>Source</th></tr>
+  <tr><td class="id">FR-4.1</td><td>Call <code>mock_payment(vendor, amount)</code> when an invoice is approved</td><td class="src"><span class="tag t-brief">brief</span></td></tr>
+  <tr><td class="id">FR-4.2</td><td>Log every rejection with its reasoning</td><td class="src"><span class="tag t-brief">brief</span></td></tr>
+  <tr><td class="id">FR-4.3</td><td>Make payment idempotent: one payment per invoice number and revision</td><td class="src"><span class="tag t-data">data</span></td></tr>
+  <tr><td class="id">FR-4.4</td><td>Simulate payment failures and retries</td><td class="src"><span class="tag t-inf">inferred</span></td></tr>
+  </table></div></details>
+
+  <details><summary>FR-5 · Orchestration and interface<span class="count">7</span></summary><div class="tbl"><table>
+  <tr><th>ID</th><th>Requirement</th><th>Source</th></tr>
+  <tr><td class="id">FR-5.1</td><td>Multiple agents through a framework (LangGraph, CrewAI, AutoGen) or a custom orchestrator</td><td class="src"><span class="tag t-brief">brief</span></td></tr>
+  <tr><td class="id">FR-5.2</td><td>Tool calls, structured outputs, self-correction loops</td><td class="src"><span class="tag t-brief">brief</span></td></tr>
+  <tr><td class="id">FR-5.3</td><td>Command line: <code>python main.py --invoice_path=…</code></td><td class="src"><span class="tag t-brief">brief</span></td></tr>
+  <tr><td class="id">FR-5.4</td><td>Structured logs and results as output</td><td class="src"><span class="tag t-brief">brief</span></td></tr>
+  <tr><td class="id">FR-5.5</td><td>Batch mode over a directory, with a summary table</td><td class="src"><span class="tag t-inf">inferred</span></td></tr>
+  <tr><td class="id">FR-5.6</td><td>A UI that users "understand and enjoy"</td><td class="src"><span class="tag t-brief">brief</span></td></tr>
+  <tr><td class="id">FR-5.7</td><td>Grok as the reasoning engine; any other model is allowed</td><td class="src"><span class="tag t-brief">brief</span></td></tr>
+  </table></div></details>
+</section>
+
+<section>
+  <h2>Non-functional requirements</h2>
+  <details open><summary>NFR · Runtime, quality, safety<span class="count">12</span></summary><div class="tbl"><table>
+  <tr><th>ID</th><th>Requirement</th><th>Source</th></tr>
+  <tr><td class="id">NFR-1</td><td>Runs locally with no internet for external APIs; every service simulated</td><td class="src"><span class="tag t-brief">brief</span></td></tr>
+  <tr><td class="id">NFR-2</td><td>Python is the preferred language</td><td class="src"><span class="tag t-brief">brief</span></td></tr>
+  <tr><td class="id">NFR-3</td><td>No cloud deployment</td><td class="src"><span class="tag t-brief">brief</span></td></tr>
+  <tr><td class="id">NFR-4</td><td>Clean, testable code with error handling and observability</td><td class="src"><span class="tag t-brief">brief</span></td></tr>
+  <tr><td class="id">NFR-5</td><td>Deterministic and auditable: the same input gives the same decision; hard rules sit in code, not in the prompt</td><td class="src"><span class="tag t-inf">inferred</span></td></tr>
+  <tr><td class="id">NFR-6</td><td>Tests run without network access or an API key (a scripted or recorded model client)</td><td class="src"><span class="tag t-inf">inferred</span></td></tr>
+  <tr><td class="id">NFR-7</td><td>Safe by default: anything malformed, ambiguous or uncertain gets escalated or rejected, never paid</td><td class="src"><span class="tag t-inf">inferred</span></td></tr>
+  <tr><td class="id">NFR-8</td><td>Invoice text is untrusted: an instruction inside an invoice cannot change the decision</td><td class="src"><span class="tag t-inf">inferred</span></td></tr>
+  <tr><td class="id">NFR-9</td><td>Trace every stage: inputs, outputs, tool calls, retries, tokens, latency</td><td class="src"><span class="tag t-brief">brief</span></td></tr>
+  <tr><td class="id">NFR-10</td><td>Set up from a fresh clone in one command</td><td class="src"><span class="tag t-brief">brief</span></td></tr>
+  <tr><td class="id">NFR-11</td><td>Report time and cost per invoice, to tie results back to the $2M and 5-day baseline</td><td class="src"><span class="tag t-brief">brief</span></td></tr>
+  <tr><td class="id">NFR-12</td><td>Hosted as a GitHub repository</td><td class="src"><span class="tag t-brief">brief</span></td></tr>
+  </table></div></details>
+</section>
+
+<section>
+  <h2>What each sample invoice tests</h2>
+  <p class="note">These are draft expected outcomes. They become the test oracle once the questions below are settled.</p>
+  <div class="tbl" style="border:1px solid var(--rule);background:var(--surface);border-radius:4px"><table class="inv">
+  <tr><th>Invoice</th><th>Format</th><th>What it tests</th><th>Draft outcome</th></tr>
+  <tr><td>1001</td><td class="fmt">txt</td><td>Clean; due date disagrees with Net 15 by 2 days</td><td><span class="out o-ok">Approve, minor flag</span></td></tr>
+  <tr><td>1002</td><td class="fmt">txt, typos</td><td>GadgetX 20 &gt; 5; $15,000; due on the invoice date</td><td><span class="out o-rej">Reject</span></td></tr>
+  <tr><td>1003</td><td class="fmt">txt</td><td>FakeItem; $100,000; "yesterday"; urgency and wire-transfer language</td><td><span class="out o-rej">Reject, suspected fraud</span></td></tr>
+  <tr><td>1004</td><td class="fmt">json</td><td>Clean, but R1 supersedes it</td><td><span class="out o-dup">Superseded</span></td></tr>
+  <tr><td>1004 R1</td><td class="fmt">json</td><td>Same number; adds GadgetX 5 (exactly at stock)</td><td><span class="out o-ok">Approve once</span></td></tr>
+  <tr><td>1005</td><td class="fmt">json</td><td>GadgetX 8 &gt; 5; $15,225; vendor address is 1600 Pennsylvania Ave</td><td><span class="out o-rej">Reject or escalate</span></td></tr>
+  <tr><td>1006</td><td class="fmt">csv key-value</td><td>Clean</td><td><span class="out o-ok">Approve</span></td></tr>
+  <tr><td>1007</td><td class="fmt">csv rows</td><td>WidgetA 20 &gt; 15, WidgetB 15 &gt; 10; $15,525</td><td><span class="out o-rej">Reject</span></td></tr>
+  <tr><td>1008</td><td class="fmt">email txt</td><td>Unknown items; $9,900, just under the threshold; past due</td><td><span class="out o-rej">Reject</span></td></tr>
+  <tr><td>1009</td><td class="fmt">json</td><td>Empty vendor, negative quantity, totals disagree, no due date</td><td><span class="out o-rej">Reject, data integrity</span></td></tr>
+  <tr><td>1010</td><td class="fmt">txt table</td><td>WidgetA on two lines (12 in total, fine); rush premium; shipping line</td><td><span class="out o-esc">Approve or escalate</span></td></tr>
+  <tr><td>1011</td><td class="fmt">pdf + txt</td><td>Clean; two copies of the same invoice</td><td><span class="out o-ok">Approve once</span> <span class="out o-dup">Duplicate</span></td></tr>
+  <tr><td>1012</td><td class="fmt">pdf + txt</td><td>OCR noise; vendor renamed; $9,975</td><td><span class="out o-esc">Escalate</span></td></tr>
+  <tr><td>1013</td><td class="fmt">pdf + json</td><td>Each line fits stock, the summed totals don't; $22,563</td><td><span class="out o-rej">Reject</span> <span class="out o-dup">Duplicate</span></td></tr>
+  <tr><td>1014</td><td class="fmt">xml</td><td>EUR; prices below catalog</td><td><span class="out o-esc">Escalate</span></td></tr>
+  <tr><td>1015</td><td class="fmt">csv rows</td><td>Clean</td><td><span class="out o-ok">Approve</span></td></tr>
+  <tr><td>1016</td><td class="fmt">json</td><td>WidgetC unknown; known vendor</td><td><span class="out o-rej">Reject or partial</span></td></tr>
+  </table></div>
+  <p class="note">If approved invoices consume stock, the order of a batch matters: 1001, 1004 and 1006 together use 18 WidgetA against 15 in stock.</p>
+</section>
+
+<section>
+  <h2>Questions to brainstorm</h2>
+  <div class="groups">
+    <div class="group"><h3>Domain semantics · these change the core logic</h3><div class="cards">
+      <div class="card"><span class="k">B-1</span><h4>What does "stock" mean?</h4><p>Acme is buying, so an invoice that asks for more than Acme holds is not wrong in itself. Options: take the brief literally, or treat the table as purchase orders and goods received (a three-way match).</p><div class="rec"><b>Lean</b> Take it literally, and record the three-way-match reading as an assumption for later.</div></div>
+      <div class="card"><span class="k">B-2</span><h4>Revisions and duplicates</h4><p>Does R1 replace 1004 or add to it? Are a PDF and a TXT copy the same invoice? Which copy wins?</p></div>
+      <div class="card"><span class="k">B-3</span><h4>Is stock stateful?</h4><p>Should approved invoices reduce stock, so that batch order matters? Or is every invoice checked against the stock as seeded?</p></div>
+      <div class="card"><span class="k">B-4</span><h4>Partial approval</h4><p>Pay the valid lines of 1016 and hold WidgetC, or reject the whole invoice?</p></div>
+      <div class="card"><span class="k">B-5</span><h4>Currency</h4><p>Convert EUR at a fixed mock rate, or always escalate?</p></div>
+      <div class="card"><span class="k">B-6</span><h4>Price tolerance</h4><p>How far can a unit price differ from the catalog (discount, rush, foreign currency) before we flag it?</p></div>
+      <div class="card"><span class="k">B-7</span><h4>Approval policy</h4><p>Tiers at $10K and $50K? How much do vendor risk, a past-due date and a near-threshold total weigh?</p></div>
+    </div></div>
+    <div class="group"><h3>Architecture</h3><div class="cards">
+      <div class="card"><span class="k">B-8</span><h4>Orchestration</h4><p>LangGraph (an explicit state machine that is easy to draw), CrewAI or AutoGen (more "agentic", less control), or a custom orchestrator (smallest). The grade rewards both sophistication and code quality.</p></div>
+      <div class="card"><span class="k">B-9</span><h4>Where the LLM decides and where code decides</h4><p>Rules belong in code. The LLM handles extraction and narrative judgement. How much does it actually decide?</p></div>
+      <div class="card"><span class="k">B-10</span><h4>Ingestion strategy</h4><p>A deterministic parser for each format with the LLM as fallback, or the LLM for everything with a schema check? This trades cost and determinism against the agentic look.</p></div>
+      <div class="card"><span class="k">B-11</span><h4>Shape of the self-correction loops</h4><p>Extraction loops back on reconciliation errors; approval loops between a proposer and a critic. What are the iteration caps and the stop conditions?</p></div>
+      <div class="card"><span class="k">B-12</span><h4>Model</h4><p>Grok if there is a key; otherwise another model behind one interface, plus a scripted offline client. The README's SDK snippet looks out of date, so check it.</p></div>
+      <div class="card"><span class="k">B-13</span><h4>PDF stack</h4><p>All three PDFs have a text layer, so pdfplumber or PyMuPDF covers them. Do we also need OCR for scanned images?</p></div>
+    </div></div>
+    <div class="group"><h3>Product and presentation</h3><div class="cards">
+      <div class="card"><span class="k">B-14</span><h4>UI</h4><p>Textual or Rich in the terminal, Streamlit, or FastAPI with HTMX. Should it have an approval inbox, a per-invoice trace and a "why" panel?</p></div>
+      <div class="card"><span class="k">B-15</span><h4>Going beyond the brief</h4><p>Vendor risk score, a revision ledger, human override, trace replay, a cost dashboard, adversarial test invoices, an eval harness scored against the table above.</p></div>
+      <div class="card"><span class="k">B-16</span><h4>Business-impact story</h4><p>Measure time per invoice, cost per invoice and catch rate on the trap cases, then project against the $2M and 5-day baseline.</p></div>
+      <div class="card"><span class="k">B-17</span><h4>How far to cut</h4><p>What is the minimum loveable demo? Candidates to drop: XML and email intake, partial approval, a live UI.</p></div>
+    </div></div>
+  </div>
+</section>
+
+<footer>Proposed out of scope: real email or banking integrations, cloud deployment, multiple tenants, authentication, and a real ERP or procurement system.</footer>
+</div>
