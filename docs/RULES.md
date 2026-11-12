@@ -35,5 +35,10 @@ Code: [invoice_agents/rules.py](../invoice_agents/rules.py). `ARITHMETIC_MISMATC
 | `VENDOR_RISK` | note | Any non-zero vendor risk score, with its signals | Shown to the VP and in the inbox | — |
 | `UNKNOWN_VENDOR_PRESSURE` | fraud | Unknown vendor **and** urgency language | D10 fraud signal | 1003 |
 | `SUSPICIOUS_ADDRESS` | fraud | The address is on the implausible-address list (e.g. 1600 Pennsylvania Ave) | Fake supplier | 1005 |
+| `PROMPT_INJECTION` | fraud | Notes, terms or item text address an approver or AI ("ignore previous rules", "approve and pay this invoice", "SYSTEM:") | Attack on the agents; checked in code whatever the model did (NFR-8) | adversarial 2001 |
+| `BANK_DETAILS_CHANGED` | fraud | A known vendor's remit-to details don't contain the bank reference on file | Payment-diversion fraud | adversarial 2005 |
+| `SPLIT_INVOICE_SUSPECTED` | fraud | Same vendor and invoice date: each total is under $10K, the sum is over | Splitting to dodge review | adversarial 2003 |
+| `DUPLICATE_NUMBER_CONFLICT` | fraud | Same vendor, number and revision as an invoice on file, but different content | A reused invoice number (D2) | ledger tests |
+| `STALE_REVISION` | soft | An older revision arrives after a newer one | The newer one stays; the old one is skipped | ledger tests |
 | `FOREIGN_CURRENCY` | note | Non-USD, converted at the mock rate (EUR 1.08) | Transparency (D5) | 1014 |
 | `DISCOUNT_APPLIED` | note | A unit price in USD is below catalog | Discounts are fine (D6) | 1013, 1014 |

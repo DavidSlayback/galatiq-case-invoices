@@ -253,6 +253,34 @@ def vendor_checks(c: Ctx) -> list[Finding]:
     return out
 
 
+INJECTION = re.compile(
+    r"(ignore (all |any )?(previous|prior|above) (rules|instructions)|^\s*system\s*:|\bassistant\s*,"
+    r"|pre-?approved by|approve (and pay )?this invoice|without further (checks|review))",
+    re.IGNORECASE | re.MULTILINE,
+)
+
+
+def prompt_injection(c: Ctx) -> list[Finding]:
+    """Text addressed to an AI reviewer inside an invoice is an attack, whatever the model did with it (NFR-8)."""
+    text = " ".join(
+        x for x in (c.invoice.notes, c.invoice.payment_terms, *(ln.item_raw for ln in c.invoice.lines)) if x
+    )
+    hits = sorted({m.group(0).strip() for m in INJECTION.finditer(text)})
+    if not hits:
+        return []
+    return [_f("PROMPT_INJECTION", "fraud", f"instructions addressed to an approver or AI: {hits}", phrases=hits)]
+
+
+def bank_details(c: Ctx) -> list[Finding]:
+    """Remittance details that do not match the registry's bank reference for a known vendor."""
+    v = c.ref.vendors.get(norm(c.invoice.vendor))
+    remit = c.invoice.remit_to
+    if not remit or v is None or not v.get("bank_ref") or str(v["bank_ref"]) in remit:
+        return []
+    msg = f"remit-to details differ from the bank on file for {v['name']}: {remit}"
+    return [_f("BANK_DETAILS_CHANGED", "fraud", msg, remit_to=remit, on_file=v["bank_ref"])]
+
+
 # --- notes ------------------------------------------------------------------
 
 
@@ -276,6 +304,8 @@ RULES: list[Rule] = [
     near_threshold,
     due_dates,
     vendor_checks,
+    prompt_injection,
+    bank_details,
     foreign_currency,
 ]
 

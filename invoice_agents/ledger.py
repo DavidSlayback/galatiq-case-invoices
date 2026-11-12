@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Any
 
-from invoice_agents.models import Invoice, InvoiceKey
+from invoice_agents.models import Finding, Invoice, InvoiceKey
 
 CORE_FIELDS = ("vendor", "invoice_number", "revision", "invoice_date", "due_date", "total", "lines")
 
@@ -122,3 +122,31 @@ def check(conn: sqlite3.Connection, key: InvoiceKey, inv: Invoice) -> Check:
         already_paid=sum((Decimal(r[0]) for r in paid), Decimal(0)),
         open_inbox_ids=[r[0] for r in inbox],
     )
+
+
+def split_findings(conn: sqlite3.Connection, key: InvoiceKey, inv: Invoice, limit: Decimal) -> list[Finding]:
+    """Same vendor, same invoice date, each under the limit but together over it: a split to dodge review."""
+    if inv.total is None or inv.invoice_date is None or inv.total >= limit:
+        return []
+    rows = conn.execute(
+        "SELECT invoice_number, core FROM invoices WHERE vendor=? AND invoice_number<>? AND core IS NOT NULL",
+        (key.vendor, key.invoice_number),
+    ).fetchall()
+    day = inv.invoice_date.isoformat()
+    siblings = [
+        (r["invoice_number"], Decimal(c["total"]))
+        for r in rows
+        if (c := json.loads(r["core"]))["invoice_date"] == day
+        and c["total"] is not None
+        and Decimal(c["total"]) < limit
+    ]
+    combined = inv.total + sum((t for _, t in siblings), Decimal(0))
+    if not siblings or combined < limit:
+        return []
+    msg = f"{len(siblings) + 1} invoices from {key.vendor} dated {day} total {combined}, each under {limit}"
+    return [
+        Finding(
+            rule_id="SPLIT_INVOICE_SUSPECTED", severity="fraud", message=msg,
+            evidence={"with": [n for n, _ in siblings], "combined": str(combined)},
+        )
+    ]  # fmt: skip

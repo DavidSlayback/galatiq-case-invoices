@@ -1,0 +1,28 @@
+{
+  "source": "data/invoices/adversarial/invoice_2003_split_b.txt",
+  "file_sha256": "2c826f6fe430b1667fead360357f0338ec8d97c692e7f4428b0eedb7ad84853f",
+  "output": {
+    "vendor": "Acme Industrial Supplies",
+    "invoice_number": "INV-2003",
+    "invoice_date": "2026-01-27",
+    "due_date": "2026-02-26",
+    "lines": [
+      {
+        "item": "WidgetA",
+        "quantity": "14",
+        "unit_price": "$250.00",
+        "amount": null,
+        "note": null
+      },
+      {
+        "item": "GadgetX",
+        "quantity": "3",
+        "unit_price": "$750.00",
+        "amount": null,
+        "note": null
+      }
+    ],
+    "total": "$5,750.00",
+    "payment_terms": "Net 30"
+  }
+}

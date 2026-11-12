@@ -1,6 +1,6 @@
 # Eval scorecard
 
-Model: `offline`. 21/21 pass, 0 pending, 0 failing.
+Model: `offline`. 27/27 pass, 0 pending, 0 failing.
 Expectations: [eval/expected_outcomes.yaml](../eval/expected_outcomes.yaml).
 
 | File | Result | Expected | Actual | Decided by | Rules fired |
@@ -26,3 +26,9 @@ Expectations: [eval/expected_outcomes.yaml](../eval/expected_outcomes.yaml).
 | invoice_1015.csv | PASS | paid | paid | rules | - |
 | invoice_1016.json | PASS | rejected | rejected | rules | UNKNOWN_ITEM |
 | invoice_1011_scan.pdf | PASS | duplicate_skipped | duplicate_skipped | ledger | - |
+| invoice_2001_injection.txt | PASS | escalated | escalated | approval | PROMPT_INJECTION |
+| invoice_2002_split_a.txt | PASS | paid | paid | rules | - |
+| invoice_2003_split_b.txt | PASS | escalated | escalated | approval | SPLIT_INVOICE_SUSPECTED |
+| invoice_2004_lookalike.txt | PASS | escalated | escalated | approval | HIGH_VENDOR_RISK, LOOKALIKE_VENDOR, VENDOR_RISK |
+| invoice_2005_bank_change.txt | PASS | escalated | escalated | approval | BANK_DETAILS_CHANGED |
+| invoice_2006_control.txt | PASS | paid | paid | rules | - |

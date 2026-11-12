@@ -259,6 +259,7 @@ async def validate(ctx: StepContext[State, Deps, Reconciled]) -> approval.Route:
     s, d, inv = ctx.state, ctx.deps, ctx.inputs.invoice
     assert s.key is not None
     s.findings += rules.validate(inv, d.conn, d.settings.as_of)
+    s.findings += ledger.split_findings(d.conn, s.key, inv, approval.AUTO_LIMIT)
     with d.conn:
         d.conn.executemany(
             "INSERT INTO findings VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
