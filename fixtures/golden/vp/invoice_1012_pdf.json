@@ -8,7 +8,7 @@
         "QuickShip states it was formerly FastShip Ltd., a known vendor, and quotes PO-20260115; prices match the catalog."
       ],
       "cited_rule_ids": [
-        "UNKNOWN_VENDOR",
+        "VENDOR_RENAMED",
         "NEAR_THRESHOLD"
       ]
     },
@@ -18,7 +18,7 @@
         "The rename note and PO reference are consistent with the FastShip relationship; the total is under the limit."
       ],
       "cited_rule_ids": [
-        "UNKNOWN_VENDOR",
+        "VENDOR_RENAMED",
         "NEAR_THRESHOLD"
       ]
     }

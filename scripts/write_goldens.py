@@ -301,7 +301,7 @@ VP_1012 = [
             "QuickShip states it was formerly FastShip Ltd., a known vendor, and quotes "
             "PO-20260115; prices match the catalog."
         ],
-        "cited_rule_ids": ["UNKNOWN_VENDOR", "NEAR_THRESHOLD"],
+        "cited_rule_ids": ["VENDOR_RENAMED", "NEAR_THRESHOLD"],
     },
     {
         "decision": "approve",
@@ -309,7 +309,7 @@ VP_1012 = [
             "The rename note and PO reference are consistent with the FastShip "
             "relationship; the total is under the limit."
         ],
-        "cited_rule_ids": ["UNKNOWN_VENDOR", "NEAR_THRESHOLD"],
+        "cited_rule_ids": ["VENDOR_RENAMED", "NEAR_THRESHOLD"],
     },
 ]
 CRITIC_1012 = [

@@ -1,5 +1,5 @@
 # Checkpoint
 
-Last completed: 10 (afk/10-ledger-batch). Next: 13 vendors, 11 inbox, 14 adversarial, 12 Streamlit, 18 live pass, 16 ROI, 19 presentation.
+Last completed: 13 (afk/13-vendor-risk). Next: 11 inbox, 14 adversarial, 12 Streamlit, 18 live pass, 16 ROI, 19 presentation.
 Resume: read docs/afk/QUEUE.md and STACK.md, `gh stack view`, then `gh stack add afk/<next>` and continue.
 Helpers: gh 2.46 `pr edit` fails (Projects classic); set PR bodies through the REST PATCH endpoint.

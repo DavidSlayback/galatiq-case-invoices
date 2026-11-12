@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 from decimal import Decimal
 
-from invoice_agents import fx
+from invoice_agents import fx, vendors
 from invoice_agents.approval import AUTO_LIMIT
 from invoice_agents.models import Finding, Invoice, Severity
 
@@ -85,11 +85,6 @@ def qty_by_sku(inv: Invoice) -> dict[str, Decimal]:
         if ln.sku:
             out[ln.sku] += ln.quantity
     return dict(out)
-
-
-def vendor_known(c: Ctx) -> bool:
-    """Exact registry match on the vendor name."""
-    return norm(c.invoice.vendor) in c.ref.vendors
 
 
 # --- hard -------------------------------------------------------------------
@@ -224,20 +219,37 @@ def urgency_text(inv: Invoice) -> str:
 
 
 def vendor_checks(c: Ctx) -> list[Finding]:
-    """Unknown vendor (soft), urgency (soft), both together (fraud), implausible address (fraud). D10, D27."""
+    """Registry match, urgency, address and the combined risk score (D9, D10, D27).
+
+    Unknown vendor and urgency alone are soft; unknown plus urgency, a look-alike
+    name, an implausible address, or a high combined score are fraud signals.
+    """
     inv, out = c.invoice, []
-    known = vendor_known(c) or not (inv.vendor or "").strip()  # a blank vendor is MISSING_VENDOR's job
+    m = vendors.match(inv.vendor, {k: v["name"] for k, v in c.ref.vendors.items()}, c.ref.aliases)  # type: ignore[misc]
     urgent = URGENCY.findall(urgency_text(inv))
-    if not known:
+    bad_addr = any(s in norm(inv.vendor_address) for s in SUSPICIOUS_ADDRESSES)
+    if m.kind == "unknown":
         out.append(_f("UNKNOWN_VENDOR", "soft", f"'{inv.vendor}' is not in the vendor registry", vendor=inv.vendor))
+    elif m.kind == "alias":
+        msg = f"'{inv.vendor}' is a registered alias of {m.registered_as}: the vendor name changed"
+        out.append(_f("VENDOR_RENAMED", "soft", msg, vendor=inv.vendor, registered_as=m.registered_as))
+    elif m.kind == "lookalike":
+        msg = f"'{inv.vendor}' looks like registered vendor {m.registered_as} but does not match it"
+        out.append(_f("LOOKALIKE_VENDOR", "fraud", msg, vendor=inv.vendor, registered_as=m.registered_as))
     if urgent:
         out.append(_f("URGENCY_LANGUAGE", "soft", f"pressure language: {', '.join(urgent)}", phrases=urgent))
-    if not known and urgent:
+    if m.kind == "unknown" and urgent:
         msg = "unknown vendor demanding urgent payment"
         out.append(_f("UNKNOWN_VENDOR_PRESSURE", "fraud", msg, vendor=inv.vendor, phrases=urgent))
-    addr = norm(inv.vendor_address)
-    if any(s in addr for s in SUSPICIOUS_ADDRESSES):
+    if bad_addr:
         out.append(_f("SUSPICIOUS_ADDRESS", "fraud", f"implausible vendor address: {inv.vendor_address}"))
+    risk, signals = vendors.score(m, bad_addr, bool(urgent))
+    if risk:
+        out.append(
+            _f("VENDOR_RISK", "note", f"vendor risk {risk}/100 ({', '.join(signals)})", score=risk, signals=signals)
+        )
+    if risk >= vendors.HIGH_RISK:
+        out.append(_f("HIGH_VENDOR_RISK", "fraud", f"vendor risk {risk}/100", score=risk, signals=signals))
     return out
 
 

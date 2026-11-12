@@ -127,5 +127,5 @@ def test_1014_eur_has_only_notes(ref: Reference):
 
 
 def test_unknown_vendor_alone_is_soft_not_fraud(ref: Reference):
-    found = check(inv(vendor="QuickShip Distributers"), ref, DEFAULT_AS_OF)
-    assert [(f.rule_id, f.severity) for f in found] == [("UNKNOWN_VENDOR", "soft")]
+    found = check(inv(vendor="NoProd Industries"), ref, DEFAULT_AS_OF)
+    assert {(f.rule_id, f.severity) for f in found} == {("UNKNOWN_VENDOR", "soft"), ("VENDOR_RISK", "note")}

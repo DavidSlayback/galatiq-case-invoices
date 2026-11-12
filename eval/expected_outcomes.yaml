@@ -16,7 +16,7 @@ data/invoices/invoice_1002.txt:
 
 data/invoices/invoice_1003.txt:
   status: rejected
-  requires: [ZERO_STOCK_ITEM, UNKNOWN_VENDOR_PRESSURE, DATE_UNPARSEABLE]
+  requires: [ZERO_STOCK_ITEM, UNKNOWN_VENDOR_PRESSURE, DATE_UNPARSEABLE, HIGH_VENDOR_RISK]
   why: FakeItem at zero stock is a hard reject; the fraud signals are recorded too (D10, D27).
 
 data/invoices/invoice_1004.json:
@@ -31,7 +31,7 @@ data/invoices/invoice_1004_revised.json:
 
 data/invoices/invoice_1005.json:
   status: rejected
-  requires: [STOCK_EXCEEDED, SUSPICIOUS_ADDRESS, UNKNOWN_VENDOR]
+  requires: [STOCK_EXCEEDED, SUSPICIOUS_ADDRESS, UNKNOWN_VENDOR, HIGH_VENDOR_RISK]
   why: GadgetX 8 > 5 (missing from the README table); the White House address is a fraud signal.
 
 data/invoices/invoice_1006.csv:
@@ -72,7 +72,8 @@ data/invoices/invoice_1011.txt:
 
 data/invoices/invoice_1012.pdf:
   status: escalated
-  requires: [UNKNOWN_VENDOR, NEAR_THRESHOLD]
+  requires: [VENDOR_RENAMED, NEAR_THRESHOLD]
+  forbids: [UNKNOWN_VENDOR, HIGH_VENDOR_RISK]
   why: Renamed vendor plus $9,975; the VP approves, the critic objects twice, so it goes to a human (D28).
 
 data/invoices/invoice_1012.txt:

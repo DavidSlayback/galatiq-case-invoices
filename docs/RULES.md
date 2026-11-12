@@ -27,8 +27,12 @@ Code: [invoice_agents/rules.py](../invoice_agents/rules.py). `ARITHMETIC_MISMATC
 | `DUE_TERMS_MISMATCH` | soft | Due date is more than ±1 day from invoice date + Net N | Vendors count terms inclusively; ±1 is tolerated (D26) | 1001, 1002 |
 | `PAST_DUE` | soft | Due date is before the processing date (`--as-of`, default 2026-02-01) | Late-payment exposure (D8) | 1008 |
 | `DATE_UNPARSEABLE` | soft | The due date is text such as "yesterday" | Never guess a date | 1003 |
-| `UNKNOWN_VENDOR` | soft | The vendor is not in the registry | New payees need a look (D27) | 1003, 1005, 1008, 1012 |
+| `UNKNOWN_VENDOR` | soft | The vendor is not in the registry (nor an alias or look-alike) | New payees need a look (D27) | 1003, 1005, 1008 |
 | `URGENCY_LANGUAGE` | soft | "urgent", "immediately", "wire transfer", … in notes or terms | Social-engineering pattern | 1003 |
+| `VENDOR_RENAMED` | soft | The name matches a registered vendor's **alias** (QuickShip → FastShip Ltd.) | A rename claimed on the invoice needs confirming (D9) | 1012 |
+| `LOOKALIKE_VENDOR` | fraud | The name is within 2 edits of a registered vendor but not equal (`Widgets lnc.`) | Classic impersonation (D10) | adversarial |
+| `HIGH_VENDOR_RISK` | fraud | Vendor risk score ≥ 60: unknown 40, alias 20, look-alike 60, suspicious address 50, urgency 20 | Several weak signals add up (D10) | 1003, 1005 |
+| `VENDOR_RISK` | note | Any non-zero vendor risk score, with its signals | Shown to the VP and in the inbox | — |
 | `UNKNOWN_VENDOR_PRESSURE` | fraud | Unknown vendor **and** urgency language | D10 fraud signal | 1003 |
 | `SUSPICIOUS_ADDRESS` | fraud | The address is on the implausible-address list (e.g. 1600 Pennsylvania Ave) | Fake supplier | 1005 |
 | `FOREIGN_CURRENCY` | note | Non-USD, converted at the mock rate (EUR 1.08) | Transparency (D5) | 1014 |
