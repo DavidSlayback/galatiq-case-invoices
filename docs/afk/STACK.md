@@ -16,4 +16,5 @@
 | 10 | afk/10-ledger-batch | afk/17-model-bridge | #13 | PASS ([evidence](evidence/10.md)) |
 | 13 | afk/13-vendor-risk | afk/10-ledger-batch | #14 | PASS ([evidence](evidence/13.md)) |
 | 11 | afk/11-inbox-cli | afk/13-vendor-risk | #15 | PASS ([evidence](evidence/11.md)) |
-| 14 | afk/14-adversarial | afk/11-inbox-cli | | PASS ([evidence](evidence/14.md)) |
+| 14 | afk/14-adversarial | afk/11-inbox-cli | #16 | PASS ([evidence](evidence/14.md)) |
+| 12 | afk/12-streamlit | afk/14-adversarial | | PASS ([evidence](evidence/12.md)) |

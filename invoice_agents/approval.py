@@ -39,6 +39,7 @@ class HumanReview(Routed):
 
     reason: str = ""
     label: str | None = None
+    detail: tuple[str, ...] = ()  # what the reviewer should read: the agents' positions, the evidence
 
 
 @dataclass(frozen=True)

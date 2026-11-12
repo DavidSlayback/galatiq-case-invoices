@@ -56,7 +56,8 @@ def _reasoning(conn: sqlite3.Connection, key: InvoiceKey) -> list[str]:
         "SELECT payload FROM invoice_events WHERE vendor=? AND invoice_number=? AND event='decided' ORDER BY id DESC",
         (key.vendor, key.invoice_number),
     ).fetchone()
-    return list(json.loads(row[0]).get("reasons", [])) if row else []
+    # The first reason is the escalation code (already shown as "why"); the rest is the substance.
+    return list(json.loads(row[0]).get("reasons", []))[1:] if row else []
 
 
 def list_open(conn: sqlite3.Connection) -> list[Item]:

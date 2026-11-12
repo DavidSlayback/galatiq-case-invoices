@@ -1,6 +1,6 @@
 # Queue
 
-**Frontier:** 12, 18.
+**Frontier:** 18, 16.
 
 | # | Ticket | Wave | Lane | Status |
 |---|---|---|---|---|
@@ -15,9 +15,9 @@
 | 09 | [eval](tickets/09-eval.md) | 5 | serial | done (#10) |
 | 10 | [ledger-batch](tickets/10-ledger-batch.md) | 6 | ledger | done (#13) |
 | 11 | [inbox-cli](tickets/11-inbox-cli.md) | 7 | inbox | done (#15) |
-| 12 | [streamlit](tickets/12-streamlit.md) | 8 | serial | todo |
+| 12 | [streamlit](tickets/12-streamlit.md) | 8 | serial | done |
 | 13 | [vendor-risk](tickets/13-vendor-risk.md) | 6 | vendors | done (#14) |
-| 14 | [adversarial](tickets/14-adversarial.md) | 7 | adversarial | done |
+| 14 | [adversarial](tickets/14-adversarial.md) | 7 | adversarial | done (#16) |
 | 15 | [ocr-chain](tickets/15-ocr-chain.md) | 5 | ocr | done (#11) |
 | 16 | [cost-roi](tickets/16-cost-roi.md) | 9 | serial | todo |
 | 17 | [model-bridge](tickets/17-model-bridge.md) | 5 | models | done (#12) |

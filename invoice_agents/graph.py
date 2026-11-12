@@ -323,7 +323,9 @@ async def critique(ctx: StepContext[State, Deps, Proposed]) -> Approve | Reject 
         return Reject(r.invoice, r.findings, r.usd_total, decision=decision)
     if r.round + 1 < approval.MAX_REVIEW_ROUNDS:
         return Objected(r.invoice, r.findings, r.usd_total, objections=tuple(verdict.objections), round=r.round)
-    return HumanReview(r.invoice, r.findings, r.usd_total, reason="vp_critic_disagree")
+    vp = f"VP proposed {r.decision.kind}: " + " ".join(r.decision.reasons)
+    critic = "Critic objected: " + " ".join(verdict.objections)
+    return HumanReview(r.invoice, r.findings, r.usd_total, reason="vp_critic_disagree", detail=(vp, critic))
 
 
 def _decided(ctx: StepContext[State, Deps, object], decision: Decision) -> InvoiceKey:
@@ -389,7 +391,7 @@ async def reject(ctx: StepContext[State, Deps, Reject]) -> Outcome:
 async def escalate(ctx: StepContext[State, Deps, HumanReview]) -> Outcome:
     """Send to the human inbox."""
     r = ctx.inputs
-    decision = Decision(kind="escalate", actor="approval", reasons=[r.reason], label=r.label)
+    decision = Decision(kind="escalate", actor="approval", reasons=[r.reason, *r.detail], label=r.label)
     key = _decided(ctx, decision)
     db.enqueue_inbox(
         ctx.deps.conn, key, reason=r.reason, label=r.label, run_id=ctx.state.run_id, actor="approval",

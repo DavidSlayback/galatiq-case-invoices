@@ -2,6 +2,8 @@
 
 import contextlib
 import io
+import subprocess
+import sys
 from datetime import date
 from pathlib import Path
 from typing import Annotated
@@ -49,11 +51,6 @@ def with_backend(s: settings_mod.Settings) -> settings_mod.Settings:
     spec, why = detect()
     console.print(f"[dim]Model: {spec} ({why}). Override with --model or INVOICE_MODEL.[/dim]")
     return s.with_overrides(model=spec, offline=True if spec == "offline" else None)
-
-
-def _not_yet() -> None:
-    console.print("[yellow]Not implemented yet.[/yellow]")
-    raise typer.Exit(1)
 
 
 @app.callback(invoke_without_command=True)
@@ -199,4 +196,5 @@ def reset(db: DbOpt = None) -> None:
 @app.command()
 def ui() -> None:
     """Launch the Streamlit dashboard."""
-    _not_yet()
+    app_path = Path(__file__).resolve().parents[1] / "app" / "streamlit_app.py"
+    raise typer.Exit(subprocess.call([sys.executable, "-m", "streamlit", "run", str(app_path)]))

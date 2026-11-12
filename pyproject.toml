@@ -19,6 +19,7 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "playwright>=1.65.1",
     "pre-commit>=4.7.0",
     "pyright>=1.1.414",
     "pytest>=9.2.0",
@@ -43,7 +44,7 @@ convention = "google"
 "tests/**" = ["D"]
 
 [tool.pyright]
-include = ["invoice_agents", "main.py", "tests"]
+include = ["invoice_agents", "main.py", "tests", "app"]
 pythonVersion = "3.14"
 typeCheckingMode = "strict"
 reportMissingTypeStubs = false
