@@ -20,13 +20,30 @@ class OcrResult:
     note: str
 
 
+MAX_PAGES = 10  # invoices are short; more pages is not an invoice, and each page costs a vision call
+MAX_PAGE_INCHES = 60  # larger than any paper size an invoice is printed on
+MAX_PIXELS = 4_000_000  # per rendered page; bounds memory regardless of the declared page size
+
+
 def render(data: bytes) -> list[bytes]:
-    """PNG bytes of each page."""
+    """PNG bytes of each page, within the page-count, page-size and pixel budgets.
+
+    Raises:
+        ValueError: Too many pages, or a page larger than any real document.
+    """
     pdf = pdfium.PdfDocument(data)
+    if len(pdf) > MAX_PAGES:
+        raise ValueError(f"{len(pdf)} pages; scanned invoices are limited to {MAX_PAGES}")
     out: list[bytes] = []
     for i in range(len(pdf)):
+        w_pt, h_pt = pdf[i].get_size()
+        if max(w_pt, h_pt) > MAX_PAGE_INCHES * 72:
+            raise ValueError(f"page {i + 1} is {w_pt / 72:.0f}x{h_pt / 72:.0f} inches")
+        scale = RENDER_DPI / 72
+        # Shrink oversized pages so width x height stays within the pixel budget.
+        scale = min(scale, (MAX_PIXELS / max(w_pt * h_pt, 1)) ** 0.5)
         buf = io.BytesIO()
-        pdf[i].render(scale=RENDER_DPI / 72).to_pil().save(buf, format="PNG")  # pyright: ignore[reportArgumentType]
+        pdf[i].render(scale=scale).to_pil().save(buf, format="PNG")  # pyright: ignore[reportArgumentType]
         out.append(buf.getvalue())
     return out
 

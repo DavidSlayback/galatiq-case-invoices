@@ -108,12 +108,19 @@ def load_xml(path: Path, data: bytes, sha: str) -> RawDocument:
     return RawDocument(path=str(path), file_sha256=sha, format="xml", text=decode(data), fields=fields)
 
 
+MIN_TEXT_CHARS = 20
+
+
 def load_pdf(path: Path, data: bytes, sha: str) -> RawDocument:
     """PDF via its text layer, keeping column layout so tables stay readable."""
     with pdfplumber.open(io.BytesIO(data)) as pdf:
+        if len(pdf.pages) > ocr.MAX_PAGES:
+            raise ValueError(f"{len(pdf.pages)} pages; invoices are limited to {ocr.MAX_PAGES}")
         pages = [p.extract_text(layout=True) or "" for p in pdf.pages]
     text = "\n\n".join(t.rstrip() for t in pages).strip()
-    if text:
+    # A text layer with almost no letters or digits (e.g. one invisible '.') is treated as absent,
+    # so a scan cannot dodge the image path with a decoy layer.
+    if sum(c.isalnum() for c in text) >= MIN_TEXT_CHARS:
         return RawDocument(path=str(path), file_sha256=sha, format="pdf", text=text)
     # No text layer: a scan. Local OCR first, page images kept for the vision model (D16).
     res = ocr.scan(data)

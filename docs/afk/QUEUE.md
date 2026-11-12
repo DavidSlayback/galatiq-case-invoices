@@ -18,7 +18,7 @@
 | 12 | [streamlit](tickets/12-streamlit.md) | 8 | serial | todo |
 | 13 | [vendor-risk](tickets/13-vendor-risk.md) | 6 | vendors | todo |
 | 14 | [adversarial](tickets/14-adversarial.md) | 7 | adversarial | todo |
-| 15 | [ocr-chain](tickets/15-ocr-chain.md) | 5 | ocr | verifying |
+| 15 | [ocr-chain](tickets/15-ocr-chain.md) | 5 | ocr | done (#11) |
 | 16 | [cost-roi](tickets/16-cost-roi.md) | 9 | serial | todo |
 | 17 | [model-bridge](tickets/17-model-bridge.md) | 5 | models | todo |
 | 18 | [live-model-pass](tickets/18-live-model-pass.md) | 8 | serial | todo (uses subscription quota, D31) |
