@@ -11,7 +11,7 @@ Loaders: txt (raw text), csv (detects the key-value vs row-per-line layout), xml
 invoice_agents/loaders/*.py, tests/test_loaders.py
 
 ## Acceptance
-- [ ] All 22 sample files load without raising
+- [ ] All 20 sample files load without raising
 - [ ] 1006 and 1007 CSV layouts give the right line-item counts (2 and 3)
 - [ ] 1014 XML parses with currency EUR
 
@@ -22,3 +22,5 @@ uv run ruff check . && uv run pyright && uv run pytest -q
 
 ## Docs
 none
+
+> The enriched tickets in [../afk/tickets/](../afk/tickets/) supersede these where they differ.

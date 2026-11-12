@@ -23,3 +23,5 @@ uv run ruff check . && uv run pyright && uv run pytest -q && uv run python main.
 
 ## Docs
 README: ledger and history
+
+> The enriched tickets in [../afk/tickets/](../afk/tickets/) supersede these where they differ.

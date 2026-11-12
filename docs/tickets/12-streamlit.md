@@ -21,3 +21,5 @@ uv run ruff check . && uv run pyright && uv run pytest -q
 
 ## Docs
 README: UI screenshots
+
+> The enriched tickets in [../afk/tickets/](../afk/tickets/) supersede these where they differ.

@@ -28,6 +28,6 @@ None block the AFK queue. H1–H3 in [HUMAN-READINESS.md](HUMAN-READINESS.md) bl
 
 ## Execution strategy
 
-- **Single worker:** walk the queue in numeric order. It is a valid topological order.
+- **Single worker:** walk the queue in numeric order. It is a valid topological order: every edge points from a lower number to a higher one, except 19→18, which are both HITL.
 - **Parallel workers:** use the lanes in [WAVES.md](WAVES.md) and merge in its integration order.
 - **Stop conditions:** a gate failure that two fix attempts can't resolve; any need for a live model call; reaching ticket 18 or 19.

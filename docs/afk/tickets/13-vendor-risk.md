@@ -26,7 +26,7 @@
 - `uv run python main.py eval --offline` — exit 0
 
 ## Change surface
-- invoice_agents/vendors.py, invoice_agents/rules.py (registration only), eval/expected_outcomes.yaml, tests/test_vendors.py
+- invoice_agents/vendors.py, invoice_agents/rules.py (registration only), invoice_agents/agents/vp.py (context), invoice_agents/cli.py and inbox list (risk column), eval/expected_outcomes.yaml, tests/test_vendors.py
 - Conflict risk: medium: the yaml is shared with 10; merge 10 first
 
 ## Out of scope

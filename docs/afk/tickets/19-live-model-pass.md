@@ -18,6 +18,7 @@
 - [ ] Recordings for every file; a diff report against the goldens
 - [ ] Live eval ≥ 16/17 originals and every adversarial row safe (no fraud file paid)
 - [ ] A live vision pass on the scanned 1011
+- [ ] Live extraction of the injection file matches its golden (the embedded instructions are ignored)
 - [ ] Measured $ per invoice fed to the ROI page
 - [ ] Total spend reported
 

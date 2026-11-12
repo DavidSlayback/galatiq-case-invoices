@@ -19,3 +19,5 @@ uv run python main.py eval --record && uv run python main.py eval
 
 ## Docs
 docs/scorecard.md, docs/STATUS.md
+
+> The enriched tickets in [../afk/tickets/](../afk/tickets/) supersede these where they differ.

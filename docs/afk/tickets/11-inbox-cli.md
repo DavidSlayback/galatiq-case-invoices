@@ -10,15 +10,15 @@
 
 ## Context
 - Why: D19; closes the human-in-the-loop path.
-- Constraining decisions: A3: the resume path reads the stored state and runs a short graph (pay or log) rather than resuming a paused run, since pydantic-graph 2.x has no persistence. A note is mandatory. Approval of an item with hard findings still requires `--override-hard` plus a note, logged as such (the guardrail applies to humans only with an explicit override).
+- Constraining decisions: A3: the resume path reads the stored state and runs a short graph (pay or log) rather than resuming a paused run, since pydantic-graph 2.x has no persistence. A note is mandatory. Hard-finding invoices are rejected before routing (D7) and never reach the inbox, and approval with a hard finding is impossible (D15), so there is no override flag. Approving a `revision_after_payment` item pays only the delta (08).
 - Failure paths: Unknown invoice → exit 1 with a message. Already resolved → exit 1. A withdrawn (superseded) item → refuse with an explanation.
 - Plan anchors: PRD FR-3.4; D19, A3
 
 ## Acceptance criteria
-- [ ] Escalate 1012 → `review INV-1012 --approve --note ok` → `paid`
+- [ ] 1012 (in the inbox by the fixed VP/critic disagreement) → `review INV-1012 --approve --note ok` → `paid`
+- [ ] 1004 R1 delta item → approve → one payment of 4,050.00
 - [ ] A missing --note exits non-zero
-- [ ] Approving a hard-finding item without --override-hard fails
-- [ ] `review --list` shows flags, risk label and agent reasoning
+- [ ] `review --list` shows flags, the escalation reason and agent reasoning (the risk score column is added by 13 if present)
 
 ## Verification
 - `uv run ruff check . && uv run ruff format --check . && uv run pyright && uv run pytest -q` — exit 0, no failures

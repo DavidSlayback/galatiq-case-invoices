@@ -1,7 +1,7 @@
 # PRD: Acme Invoice Processing Agents
 
 Status: grilled 2026-11-12. The answers to the §6 questions are in [DECISIONS.md](DECISIONS.md); that file wins wherever it and this PRD disagree.
-Source: [README.md](../README.md) at upstream `2f15015`, plus the 22 sample files in `data/invoices/`.
+Source: [README.md](../README.md) at upstream `2f15015`, plus the 20 sample files in `data/invoices/` (17 logical invoices).
 
 Each requirement is tagged with where it comes from:
 
@@ -119,7 +119,7 @@ These are draft expected outcomes for the test oracle, still to be confirmed whe
 | 1004 R1 | JSON | Same number, revised; adds GadgetX 5 (exactly at stock) | Supersedes 1004; pay at most once |
 | 1005 | JSON | GadgetX 8 > 5; $15.2K; White House address | Reject or escalate |
 | 1006 | CSV key-value | Clean | Approve |
-| 1007 | CSV rows | WidgetA 20 > 15, WidgetB 15 > 10; $15.5K | Reject |
+| 1007 | CSV rows | WidgetA 20 > 15, WidgetB 15 > 10; $15.5K; stated total wrong (14,750 + 885 = 15,635, not 15,525) | Reject |
 | 1008 | Email TXT | Unknown items; $9.9K, just under the threshold; past due | Reject |
 | 1009 | JSON | Empty vendor, negative quantity, totals disagree, no due date | Reject (data integrity) |
 | 1010 | TXT table | WidgetA appears twice (12 in total, fine); rush price premium; shipping line | Approve or escalate (price variance) |

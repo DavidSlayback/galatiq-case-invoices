@@ -10,7 +10,7 @@
 
 ## Context
 - Why: Prove the architecture end to end before broadening it, and fix the graph's shape so the wave-3 tickets can fill modules without editing graph.py.
-- Constraining decisions: D11: pydantic-graph 2.x `GraphBuilder` with steps, `decision().branch(match(T).to(...))` and `render()` (spiked 2026-11-12; there is no persistence module, so A3 resumes from SQLite). D12 and A4: offline mode replays a hand-written golden extraction through a PydanticAI `FunctionModel` keyed by sha256 of the RawDocument text, and a missing golden raises `MissingFixture`. Live recording is ticket 19. Graph nodes: load → extract ⇄ reconcile → ledger_check (pass-through stub) → validate → route → {auto_approve, vp_review (stub → inbox), human_inbox, reject} → pay or log_rejection.
+- Constraining decisions: D11: pydantic-graph 2.x `GraphBuilder` with steps, `decision().branch(match(T).to(...))` and `render()` (spiked 2026-11-12; there is no persistence module, so A3 resumes from SQLite). D12 and A4: offline mode replays a hand-written golden extraction through a PydanticAI `FunctionModel` keyed by the input file's sha256 (not the RawDocument text, so loader changes in 04 can't orphan goldens), and a missing golden raises `MissingFixture`. Live recording is ticket 19. Graph nodes: load → extract ⇄ reconcile → ledger_check (pass-through stub) → validate → route → {auto_approve, vp_review (stub → inbox), human_inbox, reject} → pay or log_rejection.
 - Failure paths: A missing fixture offline → a clear error naming the file. A non-JSON path at this stage → `LOAD_FAILED` → reject with a logged reason. Never a crash with a traceback.
 - Plan anchors: PLAN §Approach diagram; D11, D12, A3, A4
 

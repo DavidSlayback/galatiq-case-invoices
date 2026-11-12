@@ -7,7 +7,7 @@ Decisions from the grilling session on 2026-11-12. Each one comes from David unl
 | # | Decision | Why / consequence |
 |---|---|---|
 | D1 (B-1) | Check stock literally: quantity ≤ stock. The README adds one sentence: "read as a goods-received check; production would do a PO / receipt three-way match." | Matches the brief's expected outcomes. The invoices are bills to Acme ("Bill To: Acme", "Attn: Accounts Payable"), so Acme is the buyer. |
-| D2 (B-2) | Keep a ledger keyed by vendor + invoice number. A copy with the same content is skipped as a duplicate. A higher revision replaces the original if it is unpaid; if the original was paid, pay only the difference or escalate. Every replacement and every skipped duplicate is written to the event ledger (D25). | Never pay twice (1011–1013 come in two formats; 1004 has a revision R1). |
+| D2 (B-2) | Keep a ledger keyed by vendor + invoice number (revision is a column, not part of the key). A copy with the same content is skipped as a duplicate. A higher revision replaces the original if it is unpaid; if the original was paid, pay only the difference or escalate. Every replacement and every skipped duplicate is written to the event ledger (D25). | Never pay twice (1011–1013 come in two formats; 1004 has a revision R1). |
 | D3 (B-3) | Do not consume stock. Every invoice is checked against the seeded stock. | Outcomes don't depend on batch order. The README notes that production would reserve stock. |
 | D4 (B-4) | No partial approval. Reject the whole invoice; the rejection notice lists the bad lines. | Accounts payable doesn't short-pay without a credit note (1016). |
 | D5 (B-5) | Convert currency with a fixed, dated mock rate table, then apply the normal rules. Foreign currency is a note, not a flag. | 1014 is in EUR. Works offline. |
@@ -46,6 +46,17 @@ Decisions from the grilling session on 2026-11-12. Each one comes from David unl
 | # | Decision | Why / consequence |
 |---|---|---|
 | D25 | An append-only `invoice_events` table in SQLite is the audit history. It records `received`, `duplicate_skipped`, `superseded`, `validated`, `decided`, `escalated`, `human_decision`, `paid` and `payment_failed`. Each event carries the invoice key, revision, actor (agent, rule or human), a timestamp, the trace id and a JSON payload. A `superseded` event names the old and new revision and gives the line and amount differences and the reason. Each step appends its event and updates a current-status row in the same transaction. A trigger blocks UPDATE and DELETE on events. `main.py history INV-x` and the Streamlit trace view read the events. | David: replacements must be logged and referable. A state table alongside the events keeps the inbox and other queries simple. |
+
+## Added after the AFK queue review (2026-11-12, agent choices; flag if wrong)
+
+| # | Decision | Why / consequence |
+|---|---|---|
+| D25a | The event-type list is extended: `extracted`, `guardrail_override`, `withdrawn`, `payment_skipped_already_paid`, `revision_after_payment`. | The tickets needed these. |
+| D26 | DUE_TERMS_MISMATCH tolerates ±1 day. | Vendors count terms inclusively. Without the tolerance, almost every invoice is a soft flag and nothing auto-approves. |
+| D27 | Boundaries: NEAR_THRESHOLD is 9,500 ≤ total < 10,000. VP is 10,000 ≤ total ≤ 50,000; human is > 50,000. PAST_DUE is due < as_of. DUE_BEFORE_INVOICE is due ≤ invoice date. UNKNOWN_VENDOR alone is soft; with urgency or wire language it becomes the fraud rule UNKNOWN_VENDOR_PRESSURE (D10 as written). | Removes ambiguity at the edges. |
+| D28 | Fixed VP-tier outcomes for the eval: 1001 approve, 1010 approve, 1012 VP approve then critic objects twice → inbox. | Stops the eval from being circular; gives the inbox a natural sample. |
+| D29 | Payments go out in the invoice currency (1014: EUR 4,125.00) with the USD equivalent recorded (4,455.00); tiers and price rules use USD. | The mock_payment signature has no currency field. |
+| D30 | INV-1007 also has a stated-total error (14,750 + 885 = 15,635, not 15,525); its expected outcome requires ARITHMETIC_MISMATCH. | The PRD missed it; a fresh-context review found it. |
 
 ## Agent choices (not decided by David; flag if wrong)
 

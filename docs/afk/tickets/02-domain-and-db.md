@@ -16,7 +16,9 @@
 
 ## Acceptance criteria
 - [ ] Models: RawDocument, LineItem, Invoice (vendor, invoice_number, revision, dates, currency, lines, subtotal, tax, shipping, total, terms, notes, field provenance), Finding, Decision, Outcome
-- [ ] Tables: inventory(item, stock, unit_price), vendors(name, address, known, aliases_json, bank_ref), fx_rates, invoices, invoice_events, findings, payments, inbox
+- [ ] Tables: inventory(item, stock, unit_price), vendors(name, address, known, aliases_json, bank_ref), fx_rates, invoices (key vendor + invoice_number, with revision and content_hash columns, D2), invoice_events, findings, payments (vendor, invoice_number, revision, amount_paid, currency, usd_equivalent; UNIQUE(vendor, invoice_number, revision)), inbox
+- [ ] `db.enqueue_inbox(key, reason, label)` helper used by 07, 08 and 10 (11 only reads and resolves)
+- [ ] Event types are an Enum covering D25 as amended: received, extracted, duplicate_skipped, superseded, validated, decided, guardrail_override, escalated, withdrawn, human_decision, paid, payment_skipped_already_paid, payment_failed, revision_after_payment
 - [ ] BEFORE UPDATE/DELETE triggers on invoice_events RAISE(ABORT)
 - [ ] `db.record(event, status_update)` is atomic; a test injects a failure and sees no event row
 - [ ] `main.py reset` seeds WidgetA 15/$250, WidgetB 10/$500, GadgetX 5/$750, FakeItem 0/$0, the D9 vendors and A6's rate

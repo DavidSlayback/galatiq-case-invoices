@@ -10,14 +10,15 @@
 
 ## Context
 - Why: FR-4; the never-pay-twice guarantee needed by D2.
-- Constraining decisions: A7: keep the brief's signature and add an injectable failure hook. D4: a rejection lists the bad lines rather than short-paying.
+- Constraining decisions: A7: keep the brief's signature and add an injectable failure hook. D4: a rejection lists the bad lines rather than short-paying. D2: a revision after payment pays only the difference (amount = new total − sum of amount_paid for vendor+number). D29 (agent choice): pay in the invoice currency (1014 pays EUR 4,125.00) and record the USD equivalent at the A6 rate; tiers and price rules use USD.
 - Failure paths: A double call in the same run or across runs → one `paid` event. A crash between payment and event → payments has a unique key, so a retry sees the existing row.
 - Plan anchors: PRD FR-4; D4, A7
 
 ## Acceptance criteria
-- [ ] UNIQUE(vendor, invoice_number, revision) on payments
+- [ ] UNIQUE(vendor, invoice_number, revision) on payments, with amount_paid recorded; the total paid across revisions of one invoice never exceeds the latest revision's total
+- [ ] 1014 payment records EUR 4,125.00 and USD 4,455.00
 - [ ] A second pay of the same key → no mock_payment call, a `payment_skipped_already_paid` event
-- [ ] Forced failure → 2 attempts, `payment_failed`, an inbox row
+- [ ] Forced failure → 2 attempts, `payment_failed`, an inbox row through `db.enqueue_inbox`
 - [ ] A rejection event payload has the reason, finding IDs and bad lines
 
 ## Verification

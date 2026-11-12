@@ -15,7 +15,7 @@
 - Plan anchors: PLAN §Acceptance evidence; D20, A8
 
 ## Acceptance criteria
-- [ ] eval/expected_outcomes.yaml has one row per file (22 rows incl. the duplicate copies), each with a rationale comment
+- [ ] eval/expected_outcomes.yaml has one row per file (20 rows incl. the 3 second copies and R1), each with a rationale comment. Fixed rows: auto-pay 1004, 1006, 1011 (first copy), 1014, 1015; VP approve 1001, 1010; VP→critic→inbox 1012; hard reject 1002, 1003, 1005, 1007 (STOCK_EXCEEDED + ARITHMETIC_MISMATCH), 1008, 1009, 1013, 1016
 - [ ] `eval --offline` passes every non-pending row; pending rows are listed separately
 - [ ] The scorecard shows file, expected, actual, missing/extra rule IDs, and seconds
 - [ ] tests/test_eval_offline.py runs the eval

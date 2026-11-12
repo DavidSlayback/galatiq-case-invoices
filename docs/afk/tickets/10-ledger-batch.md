@@ -10,7 +10,7 @@
 
 ## Context
 - Why: D2 and D25: never pay twice, and a referable history of replacements (David, 2026-11-12).
-- Constraining decisions: Key = vendor + number + revision. Duplicate = same key and the same sha256 of the canonical Invoice JSON, not file bytes (the PDF and TXT copies differ). Same key with different content → DUPLICATE_NUMBER_CONFLICT (fraud). A higher revision: original unpaid → superseded, inbox row withdrawn, new one processed; original paid → superseded plus the delta escalated as `revision_after_payment` (A8).
+- Constraining decisions: Key = vendor + invoice number (D2); revision is a column. Duplicate = same key, same revision, and the same core fingerprint: vendor, number, revision, invoice date, due date, lines (sku, qty, unit_price) and total. A field missing on one side counts as compatible, because 1011's PDF lacks subtotal/tax/terms and 1013's PDF lacks address/tax_rate. Same key and revision with a conflicting core field → DUPLICATE_NUMBER_CONFLICT (fraud). A higher revision: original unpaid → superseded, inbox row withdrawn, new one processed; original paid → superseded plus the delta escalated as `revision_after_payment` (A8); human approval pays only the delta (08).
 - Failure paths: A revision lower than the existing one → STALE_REVISION (soft) and the original is kept. Vendor-name variance between copies → normalise before keying.
 - Plan anchors: PRD FR-2.10, FR-5.5; D2, D25, A8
 

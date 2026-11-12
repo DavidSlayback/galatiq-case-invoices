@@ -6,7 +6,7 @@
 **Wave:** 3
 **Lane:** loaders
 **Verifier profile:** full (untrusted parser)
-**What it delivers:** `loaders.load(path)` returns a RawDocument for all 22 sample files, with deterministic fields where the format allows.
+**What it delivers:** `loaders.load(path)` returns a RawDocument for all 20 sample files (17 logical invoices: 16 numbers plus R1; 3 numbers come in two formats), with deterministic fields where the format allows.
 
 ## Context
 - Why: FR-1.2. D13 says parsers come first so the LLM confirms rather than guesses.
@@ -15,7 +15,7 @@
 - Plan anchors: PRD FR-1.2; D13
 
 ## Acceptance criteria
-- [ ] All 22 files in data/invoices load without raising
+- [ ] All 20 files in data/invoices load without raising
 - [ ] 1006 → 2 lines; 1007 → 3 lines plus subtotal/tax/total; 1015 → 3 lines
 - [ ] 1014 XML → currency EUR, 2 lines
 - [ ] PDFs 1011/1012/1013 → non-empty text containing the invoice number
@@ -23,7 +23,7 @@
 
 ## Verification
 - `uv run ruff check . && uv run ruff format --check . && uv run pyright && uv run pytest -q` — exit 0, no failures
-- `uv run pytest -q tests/test_loaders.py` — 22 sample-file params pass
+- `uv run pytest -q tests/test_loaders.py` — 20 sample-file params pass
 
 ## Change surface
 - invoice_agents/loaders/*.py, tests/test_loaders.py, tests/fixtures/bad/

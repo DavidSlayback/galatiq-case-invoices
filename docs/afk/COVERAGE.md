@@ -63,6 +63,12 @@
 | D22 build order | WAVES.md |
 | D23 tooling | 01 |
 | D24 presentation | 17 |
+| D25a extended event types | 02 |
+| D26 terms tolerance | 06 |
+| D27 boundaries, UNKNOWN_VENDOR severity | 06, 07 |
+| D28 fixed VP outcomes | 07, 09 |
+| D29 payment currency | 08 |
+| D30 1007 arithmetic | 05, 06, 09 |
 | A2 Haiku | 01 |
 | A3 resume from SQLite | 11 |
 | A4 goldens offline, live recording later | 03, 05, 19 |

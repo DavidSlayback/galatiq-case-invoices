@@ -4,7 +4,7 @@
 
 **AFK queue:** [afk/QUEUE.md](afk/QUEUE.md) holds the enriched tickets, waves and human-readiness items.
 
-**Current state (2026-11-12):** the repo holds only the brief (`README.md`), 22 sample files in `data/invoices/`, `data/generate_pdfs.py`, and three docs: [PRD.md](PRD.md) (requirements), [DECISIONS.md](DECISIONS.md) (D1–D25, locked by David) and `prd.html` (the page behind the PRD Artifact). There is no code yet.
+**Current state (2026-11-12):** the repo holds only the brief (`README.md`), 20 sample files in `data/invoices/` (17 logical invoices), `data/generate_pdfs.py`, and three docs: [PRD.md](PRD.md) (requirements), [DECISIONS.md](DECISIONS.md) (D1–D25, locked by David) and `prd.html` (the page behind the PRD Artifact). There is no code yet.
 
 **Workflow state:**
 - Done: intake → grilling → decisions.
@@ -44,7 +44,7 @@
 - **A1:** the package is `invoice_agents/`, and `main.py` at the repo root is a thin Typer entry point that keeps the brief's `python main.py --invoice_path=…` working.
 - **A2:** the default stand-in model is `anthropic:claude-haiku-5-5` (David, 2026-11-12), set by `INVOICE_MODEL` or `--model`.
 - **A3:** a human decision does not resume a paused graph run. It runs a short graph from the stored decision state (approved → pay; rejected → log).
-- **A4:** `--offline` replays hand-written golden outputs (`tests/fixtures/golden/`) through a `FunctionModel`, keyed by sha256 of the input. A missing golden fails loudly; it is never guessed. David ruled no live calls unattended (2026-11-12), so live recording and comparison is HITL ticket 19.
+- **A4:** `--offline` replays hand-written golden outputs (`tests/fixtures/golden/`) through a `FunctionModel`, keyed by the input file's sha256. A missing golden fails loudly; it is never guessed. David ruled no live calls unattended (2026-11-12), so live recording and comparison is HITL ticket 19.
 - **A5:** rules have stable IDs (for example `STOCK_EXCEEDED`, `PRICE_OVER_CATALOG`) and a severity of `hard`, `soft`, `fraud` or `note`. The agents cite these IDs, and the eval asserts on them.
 - **A6:** the mock rate table holds `EUR→USD 1.08` dated 2026-01-31, labelled as mock data.
 - **A8:** in the fixed eval order, 1004 is auto-paid before R1 arrives. So per D2, R1's expected outcome is a `superseded` event plus the +$4,050 delta escalated, not a second full payment. `expected_outcomes.yaml` encodes this, which changes PRD §5's draft row.
@@ -116,7 +116,7 @@ The tickets live in [tickets/](tickets/). Their blocking edges:
 | Outcome | Ticket | Check | Status |
 |---|---|---|---|
 | End-to-end run from the CLI on one invoice | 03 | `uv run python main.py --invoice_path=data/invoices/invoice_1004.json --offline` exits 0 and shows `paid` | not started |
-| All 17 originals match the expected outcomes | 09 | `uv run python main.py eval --offline` prints 17/17 | not started |
+| All 17 originals match the expected outcomes | 09 | `uv run python main.py eval --offline` passes every non-pending row (all rows after ticket 10) | not started |
 | Never pays twice; revisions logged | 10 | Eval batch: 1011/1012/1013 second copies produce `duplicate_skipped`; 1004 R1 produces `superseded` plus an escalated delta | not started |
 | Human-in-the-loop path completes | 11 | Test: escalate 1012, `review --approve`, then a `paid` event | not started |
 | The LLM can't override hard rules | 07, 14 | Prompt-injection invoice is never `paid` | not started |

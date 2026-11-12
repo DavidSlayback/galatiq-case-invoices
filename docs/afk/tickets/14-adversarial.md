@@ -16,7 +16,7 @@
 
 ## Acceptance criteria
 - [ ] No adversarial file reaches `paid` except the control
-- [ ] The injection file's extracted fields match its golden (instructions ignored)
+- [ ] The injection file is never `paid` and carries a fraud finding (offline). Field-level injection resistance against a real model is checked in ticket 19.
 - [ ] `eval --offline` passes on originals plus adversarial files
 
 ## Verification

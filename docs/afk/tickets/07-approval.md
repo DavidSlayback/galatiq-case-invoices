@@ -10,12 +10,13 @@
 
 ## Context
 - Why: FR-3; the brief's reflection/critique loop; NFR-7.
-- Constraining decisions: D7 tiers: hard → reject; fraud or >$50K → human with a 'suspected fraud' label when fraud (D10); $10K–$50K or soft → VP; else auto. D15: the VP proposes with cited rule IDs and a separate critic checks; single-agent self-reflection was rejected as a weaker check. The guardrail is in code, not the prompt (FR-3.6). The VP and critic offline use scripted FunctionModels with per-invoice golden responses.
+- Constraining decisions: D7 tiers: hard → reject; fraud or >$50K → human with a 'suspected fraud' label when fraud (D10); $10K–$50K or soft → VP; else auto. D15: the VP proposes with cited rule IDs and a separate critic checks; single-agent self-reflection was rejected as a weaker check. The guardrail is in code, not the prompt (FR-3.6). The VP and critic offline use scripted FunctionModels with per-invoice golden responses. The VP goldens follow outcomes fixed in eval/expected_outcomes.yaml before they are written (D28, agent choice): 1001 → approve (a 2-day terms variance is immaterial); 1010 → approve (the rush surcharge is itemised and labelled); 1012 → the VP approves, the critic objects twice (vendor renamed and near threshold, no verified remit details) → inbox. Tier boundaries: $10,000 ≤ total ≤ $50,000 is VP; > $50,000 is human; $9,999.99 with no flags is auto.
 - Failure paths: The VP cites a rule ID that doesn't exist → critic objection plus a retry. The model returns invalid structured output → PydanticAI retry, then escalate. Disagreement after round 2 → inbox, never a default approval.
 - Plan anchors: PRD FR-3; D7, D10, D15
 
 ## Acceptance criteria
-- [ ] Table test across the boundaries $9,499.99/$9,500/$10,000/$50,000/$50,000.01 with and without each severity
+- [ ] Table test across the boundaries $9,499.99/$9,500/$9,999.99/$10,000/$50,000/$50,000.01 with and without each severity
+- [ ] Escalations call `db.enqueue_inbox`
 - [ ] A scripted VP approving with a hard finding → reject plus a `guardrail_override` event
 - [ ] Scripted disagreement for 2 rounds → inbox, with both transcripts stored in the JSONL trace
 - [ ] The decision event payload contains cited_rule_ids and the critic verdicts
