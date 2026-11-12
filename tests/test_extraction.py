@@ -10,7 +10,17 @@ from pydantic_ai.models.function import AgentInfo, FunctionModel
 
 from invoice_agents import graph
 from invoice_agents.agents.extractor import INSTRUCTIONS, extractor
-from invoice_agents.normalize import RawExtraction, invoice_number, money, ocr_digits, parse_date, sku, to_invoice
+from invoice_agents.normalize import (
+    NormalizeError,
+    RawExtraction,
+    RawLine,
+    invoice_number,
+    money,
+    ocr_digits,
+    parse_date,
+    sku,
+    to_invoice,
+)
 from invoice_agents.settings import Settings
 from tests.conftest import INVOICES, ROOT
 
@@ -44,6 +54,34 @@ def test_parse_date(raw: str, expected: date | None):
 )
 def test_money(raw: str, expected: Decimal):
     assert money(raw) == expected
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("(250.00)", Decimal("-250.00")),
+        ("€4,125.00", Decimal("4125.00")),
+        ("USD 100", Decimal(100)),
+        ("12 pcs", Decimal(12)),
+    ],
+)
+def test_money_accepted_forms(raw: str, expected: Decimal):
+    assert money(raw) == expected
+
+
+@pytest.mark.parametrize("raw", ["1.234,56", "1,5", "1,234,56", "1e5", "1/2", "$1,2x", "5%"])
+def test_ambiguous_amounts_raise_instead_of_guessing(raw: str):
+    with pytest.raises(NormalizeError):
+        money(raw)
+
+
+def test_blank_quantity_is_an_error_not_zero():
+    with pytest.raises(NormalizeError):
+        to_invoice(RawExtraction(lines=[RawLine(item="WidgetA", quantity="")]))
+
+
+def test_currency_code_must_be_iso():
+    assert to_invoice(RawExtraction(currency="usd$", total="€5")).currency == "EUR"
 
 
 def test_ocr_repair_only_touches_numeric_tokens():

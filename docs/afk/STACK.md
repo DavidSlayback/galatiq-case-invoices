@@ -9,4 +9,4 @@
 | 06 | afk/06-rules | afk/04-loaders | #6 | PASS ([evidence](evidence/06.md)) |
 | 08 | afk/08-payment | afk/06-rules | #7 | PASS ([evidence](evidence/08.md)) |
 | 07 | afk/07-approval | afk/08-payment | #8 | PASS ([evidence](evidence/07.md)) |
-| 05 | afk/05-extraction-agent | afk/07-approval | | verifying ([evidence](evidence/05.md)) |
+| 05 | afk/05-extraction-agent | afk/07-approval | #9 | PASS after fix round ([evidence](evidence/05.md)) |

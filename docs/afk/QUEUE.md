@@ -8,7 +8,7 @@
 | 02 | [domain-and-db](tickets/02-domain-and-db.md) | 1 | serial | done (#2) |
 | 03 | [tracer-bullet](tickets/03-tracer-bullet.md) | 2 | serial | done (#4) |
 | 04 | [loaders](tickets/04-loaders.md) | 3 | loaders | done (#5) |
-| 05 | [extraction-agent](tickets/05-extraction-agent.md) | 4 | serial | verifying |
+| 05 | [extraction-agent](tickets/05-extraction-agent.md) | 4 | serial | done (#9) |
 | 06 | [rules](tickets/06-rules.md) | 3 | rules | done (#6) |
 | 07 | [approval](tickets/07-approval.md) | 3 | approval | done (#8) |
 | 08 | [payment](tickets/08-payment.md) | 3 | payment | done (#7) |
