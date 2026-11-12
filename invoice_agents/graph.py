@@ -8,13 +8,12 @@ the stage modules (rules, approval, payment), not here.
 import asyncio
 import sqlite3
 from dataclasses import dataclass, field
-from decimal import Decimal
 from pathlib import Path
 
 from pydantic_ai.messages import ModelMessage
 from pydantic_graph import GraphBuilder, StepContext
 
-from invoice_agents import approval, db, payment, reconcile, rules
+from invoice_agents import approval, db, fx, payment, reconcile, rules
 from invoice_agents.agents import extractor
 from invoice_agents.approval import Approve, AutoApprove, HumanReview, Reject, VpReview
 from invoice_agents.ledger import key_for
@@ -165,11 +164,6 @@ async def retry(ctx: StepContext[State, Deps, Retry]) -> Loaded:
     return Loaded(ctx.state.doc)
 
 
-def usd_total(inv: Invoice) -> Decimal | None:
-    """Total in USD, or None when it cannot be determined."""
-    return inv.total if inv.currency == "USD" else None
-
-
 @g.step
 async def validate(ctx: StepContext[State, Deps, Reconciled]) -> approval.Route:
     """Run the rules and pick the approval route."""
@@ -185,7 +179,7 @@ async def validate(ctx: StepContext[State, Deps, Reconciled]) -> approval.Route:
         d.conn, s.key, EventType.VALIDATED, actor="rules", run_id=s.run_id,
         payload={"findings": [f.model_dump() for f in s.findings]}, status=Status.VALIDATED,
     )  # fmt: skip
-    r = approval.route(inv, s.findings, usd_total(inv))
+    r = approval.route(inv, s.findings, fx.to_usd(inv.total, inv.currency, fx.rates(d.conn)))
     d.tracer.log("route", route=type(r).__name__, findings=[f.rule_id for f in s.findings])
     return r
 
