@@ -43,4 +43,22 @@ Run started and finished on 2026-11-12 (one session, with one restart). All 19 t
 
 ## Close-out
 
-See the end of this file, filled in once the merge and the final gate are done.
+1. **Final independent review** (a fresh-context agent over the whole stack, plus the evidence gate):
+   - Every brief requirement passed, except tool use (PARTIAL: the agents use structured-output tools, not function tools) and the claims that rest only on the live runs (INCONCLUSIVE).
+   - It found 11 defects, 5 of which could move money wrongly. All were fixed in PR #21 (D36–D39) with 14 regression tests.
+2. **Explainer republished** at commit e6f0b66, with QA at 0 defects.
+3. **Merge:** all 20 PRs merged atomically into `main` at **2b73626**. A fresh clone of `main` passes the gate (275 tests) and the offline eval at 27/27. Branches deleted. There is no remote CI (none is configured); the local gate is the CI.
+
+## Retro
+
+- **Independent verification paid off.** Every fresh-context review found real defects my own checks had missed: 14 at queue review, about 8 across the parser verifiers, and 11 at the final review. The vendor-key double-pay (B1) and the cross-vendor inbox approval (B3) were serious, and only an adversarial reader looking at the whole system found them. Next time, run the holistic review at the midpoint (after 10), not only at the end.
+- **Live runs found design gaps, not just bugs.** The policy text's approve/reject gap and the vendor-change routing (D33) came from watching real models judge, not from the scripted goldens. One early live smoke test should be part of the first agent ticket.
+- **Scripted edits drift against the formatter.** Several multi-step substitution scripts failed half-applied after ruff reformatted lines. Use the Edit tool, or re-read before scripting.
+- **Mutation-checking each guard** caught one test that could not fail: the idempotency guard's first check missed because the line had been reformatted. Keep doing it.
+
+## Follow-ups (not started)
+
+- Purchase-order three-way match, replacing the literal stock check (D1).
+- An idempotency key at the bank call (a crash between the bank call and the ledger write could double-pay).
+- Agent function tools (for example, the VP looking up vendor history) if graders weight "tool use" literally.
+- Auto-detect should check that a CLI is logged in before choosing it (B9; documented for now).

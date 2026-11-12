@@ -146,4 +146,4 @@ fixtures/golden/           recorded model answers for offline mode
 docs/                      brief, PRD, decisions, rules, live results, plan and tickets
 ```
 
-Checks: `scripts/check-all` (ruff, pyright strict, 250+ tests including the offline eval), also run as a pre-commit hook.
+Checks: `scripts/check-all` (ruff, pyright strict, 275 tests including the offline eval), also run as a pre-commit hook.

@@ -21,4 +21,6 @@
 | 18 | afk/18-live-model-pass | afk/12-streamlit | #18 | PASS ([evidence](evidence/18.md)) |
 | 16 | afk/16-cost-roi | afk/18-live-model-pass | #19 | PASS ([evidence](evidence/16.md)) |
 | 19 | afk/19-presentation | afk/16-cost-roi | #20 | PASS ([evidence](evidence/19.md)) |
-| 20 | afk/20-closeout-fixes | afk/19-presentation | | PASS ([evidence](evidence/20.md)) |
+| 20 | afk/20-closeout-fixes | afk/19-presentation | #21 | PASS ([evidence](evidence/20.md)) |
+
+All 20 PRs merged atomically into main at 2b73626 (2026-11-12); branches deleted.
