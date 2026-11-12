@@ -19,4 +19,5 @@
 | 14 | afk/14-adversarial | afk/11-inbox-cli | #16 | PASS ([evidence](evidence/14.md)) |
 | 12 | afk/12-streamlit | afk/14-adversarial | #17 | PASS ([evidence](evidence/12.md)) |
 | 18 | afk/18-live-model-pass | afk/12-streamlit | #18 | PASS ([evidence](evidence/18.md)) |
-| 16 | afk/16-cost-roi | afk/18-live-model-pass | | PASS ([evidence](evidence/16.md)) |
+| 16 | afk/16-cost-roi | afk/18-live-model-pass | #19 | PASS ([evidence](evidence/16.md)) |
+| 19 | afk/19-presentation | afk/16-cost-roi | | PASS ([evidence](evidence/19.md)) |

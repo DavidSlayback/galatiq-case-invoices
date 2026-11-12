@@ -5,7 +5,7 @@ from streamlit.testing.v1 import AppTest
 
 from tests.conftest import ROOT
 
-PAGES = ROOT / "app" / "pages"
+PAGES = ROOT / "app" / "views"
 
 
 @pytest.fixture(autouse=True)

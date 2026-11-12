@@ -27,7 +27,8 @@ for it in items:
         st.markdown(f"### {label}{it.key.invoice_number} · {it.key.vendor}")
         cols = st.columns(3)
         cols[0].metric("Amount", amount)
-        cols[1].metric("Why it is here", it.reason.replace("_", " "))
+        # Plain text, not a metric: reasons like "fraud signals: PROMPT_INJECTION" are too long for one.
+        cols[1].markdown(f"Why it is here\n\n**{it.reason.replace('_', ' ')}**")
         cols[2].metric("Vendor risk", f"{it.risk}/100" if it.risk is not None else "-")
         if it.flags:
             st.markdown("**Flags:** " + "  ".join(chip(f, "orange") for f in it.flags))

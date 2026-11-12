@@ -54,7 +54,7 @@ def test_roi_page_recomputes_when_inputs_change(tmp_path: Path, monkeypatch: pyt
     monkeypatch.setenv("INVOICE_DB", str(tmp_path / "ui.db"))
     monkeypatch.setenv("RUNS_DIR", str(tmp_path / "runs"))
     monkeypatch.setenv("INVOICE_MODEL", "offline")
-    at = AppTest.from_file(str(ROOT / "app" / "pages" / "roi.py"), default_timeout=120)
+    at = AppTest.from_file(str(ROOT / "app" / "views" / "roi.py"), default_timeout=120)
     at.run()
     assert not at.exception
     before = next(m.value for m in at.metric if m.label == "Annual cost")

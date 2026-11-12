@@ -9,7 +9,7 @@ Acme loses **$2M a year** processing invoices by hand: a 30% error rate and a 5-
 | Handled with no person | 0% | **78%**, on a test set deliberately full of problems |
 | Model cost per invoice | — | **~4.4¢** (Grok 4.7 at published API prices) |
 
-The case brief is in [docs/BRIEF.md](docs/BRIEF.md).
+The case brief is in [docs/BRIEF.md](docs/BRIEF.md). A 2½-minute narrated demo is in [docs/demo/demo.mp4](docs/demo/demo.mp4) (synthetic voice; every screen is real command output). The presentation is a one-page walkthrough of the architecture, decisions and results: [Acme Invoice Agents explainer](https://claude.ai/artifact/Uk4Fdc3Wff3zQPaVSpUghN) (commit 2996eaf).
 
 ## Quickstart
 

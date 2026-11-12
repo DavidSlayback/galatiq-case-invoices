@@ -5,7 +5,7 @@ from pathlib import Path
 
 import streamlit as st
 
-PAGES = Path(__file__).parent / "pages"
+PAGES = Path(__file__).parent / "views"  # not "pages/": Streamlit would auto-list those files by name
 # `streamlit run` puts app/ on the path, not the repo root the pages import from.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
