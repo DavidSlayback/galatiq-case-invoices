@@ -10,6 +10,8 @@ from rich.console import Console
 from invoice_agents import eval as eval_mod
 from invoice_agents import graph
 from invoice_agents import settings as settings_mod
+from invoice_agents.agents.cli_bridge import BackendQuotaError
+from invoice_agents.agents.models import detect
 from invoice_agents.agents.offline import MissingFixture
 from invoice_agents.report import outcome_panel
 from invoice_agents.seed import open_db
@@ -35,6 +37,16 @@ def build_settings(model: str | None, offline: bool, as_of: str | None, db: Path
         as_of=date.fromisoformat(as_of) if as_of else None,
         db_path=db,
     )
+
+
+def with_backend(s: settings_mod.Settings) -> settings_mod.Settings:
+    """Resolve an unset model with auto-detect (D32) and say which backend runs and why."""
+    if s.offline or s.model:
+        console.print(f"[dim]Model: {'offline replay' if s.offline else s.model} (configured)[/dim]")
+        return s
+    spec, why = detect()
+    console.print(f"[dim]Model: {spec} ({why}). Override with --model or INVOICE_MODEL.[/dim]")
+    return s.with_overrides(model=spec, offline=True if spec == "offline" else None)
 
 
 def _not_yet() -> None:
@@ -71,13 +83,16 @@ def process(
     db: DbOpt = None,
 ) -> None:
     """Run one invoice through ingestion, validation, approval and payment."""
-    s = build_settings(model, offline, as_of, db)
+    s = with_backend(build_settings(model, offline, as_of, db))
     conn = open_db(s.db_path)
     try:
         outcome = graph.process_sync(invoice_path, s, conn)
     except MissingFixture as e:
         console.print(f"[red]Offline mode has no recorded answer for this file:[/red] {e}")
         raise typer.Exit(2) from e
+    except BackendQuotaError as e:
+        console.print(f"[red]Stopped: {e}[/red] Wait for the quota to reset or pick another --model.")
+        raise typer.Exit(3) from e
     console.print(outcome_panel(outcome))
 
 
@@ -90,8 +105,12 @@ def eval_cmd(
     ),
 ) -> None:
     """Score every sample invoice against eval/expected_outcomes.yaml (fresh database, fixed order)."""
-    s = build_settings(model, offline, None, None)
-    rows = eval_mod.run(s)
+    s = with_backend(build_settings(model, offline, None, None))
+    try:
+        rows = eval_mod.run(s)
+    except BackendQuotaError as e:
+        console.print(f"[red]Stopped: {e}[/red] Wait for the quota to reset or pick another --model.")
+        raise typer.Exit(3) from e
     console.print(eval_mod.table(rows))
     if scorecard:
         scorecard.write_text(eval_mod.markdown(rows, s.model or "offline"), encoding="utf-8")

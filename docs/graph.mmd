@@ -6,39 +6,47 @@ stateDiagram-v2
   state decision <<choice>>
   extract
   load_failed
-  reconcile_step
   state decision_2 <<choice>>
+  extract_failed
+  reconcile_step
+  state decision_3 <<choice>>
   retry
   validate
-  state decision_3 <<choice>>
+  state decision_4 <<choice>>
   escalate
   pay
   reject
   vp_propose
+  state decision_5 <<choice>>
   critique
-  state decision_4 <<choice>>
+  state decision_6 <<choice>>
 
   [*] --> load_file
   load_file --> decision
   decision --> extract
   decision --> load_failed
-  extract --> reconcile_step
+  extract --> decision_2
   load_failed --> [*]
-  reconcile_step --> decision_2
-  decision_2 --> retry
-  decision_2 --> validate
+  decision_2 --> extract_failed
+  decision_2 --> reconcile_step
+  extract_failed --> [*]
+  reconcile_step --> decision_3
+  decision_3 --> retry
+  decision_3 --> validate
   retry --> extract
-  validate --> decision_3
-  decision_3 --> escalate
-  decision_3 --> pay
-  decision_3 --> reject
-  decision_3 --> vp_propose
-  escalate --> [*]
-  pay --> [*]
-  reject --> [*]
-  vp_propose --> critique
-  critique --> decision_4
+  validate --> decision_4
   decision_4 --> escalate
   decision_4 --> pay
   decision_4 --> reject
   decision_4 --> vp_propose
+  escalate --> [*]
+  pay --> [*]
+  reject --> [*]
+  vp_propose --> decision_5
+  decision_5 --> escalate
+  decision_5 --> critique
+  critique --> decision_6
+  decision_6 --> escalate
+  decision_6 --> pay
+  decision_6 --> reject
+  decision_6 --> vp_propose

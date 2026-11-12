@@ -10,6 +10,7 @@ import sqlite3
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from pydantic_ai.exceptions import UnexpectedModelBehavior
 from pydantic_ai.messages import ModelMessage
 from pydantic_graph import GraphBuilder, StepContext
 
@@ -28,6 +29,7 @@ from invoice_agents.models import (
     RawDocument,
     Status,
 )
+from invoice_agents.normalize import NormalizeError
 from invoice_agents.settings import Settings
 from invoice_agents.trace import Tracer, new_run_id
 
@@ -83,6 +85,13 @@ class Extracted:
 
 
 @dataclass(frozen=True)
+class ExtractFailed:
+    """The model could not produce a usable extraction within its retry budget."""
+
+    reason: str
+
+
+@dataclass(frozen=True)
 class Retry:
     """Reconciliation failed; try extraction again with this feedback."""
 
@@ -120,10 +129,14 @@ async def load_file(ctx: StepContext[State, Deps, Path]) -> Loaded | LoadFailed:
 
 
 @g.step
-async def extract(ctx: StepContext[State, Deps, Loaded]) -> Extracted:
-    """Ask the extraction agent for a typed invoice."""
+async def extract(ctx: StepContext[State, Deps, Loaded]) -> Extracted | ExtractFailed:
+    """Ask the extraction agent for a typed invoice; a model that keeps failing goes to a human."""
     s = ctx.state
-    result = await extractor.extract(ctx.inputs.doc, ctx.deps.settings, s.feedback, s.history, s.attempt)
+    try:
+        result = await extractor.extract(ctx.inputs.doc, ctx.deps.settings, s.feedback, s.history, s.attempt)
+    except (UnexpectedModelBehavior, NormalizeError) as e:
+        ctx.deps.tracer.log("extract", attempt=s.attempt, error=str(e))
+        return ExtractFailed(f"extraction failed: {e}")
     s.history, s.model_name = result.messages, result.model_name
     ctx.deps.tracer.log(
         "extract", attempt=s.attempt, model=result.model_name, invoice=result.invoice.model_dump(mode="json")
@@ -194,7 +207,7 @@ async def validate(ctx: StepContext[State, Deps, Reconciled]) -> approval.Route:
 
 
 @g.step
-async def vp_propose(ctx: StepContext[State, Deps, VpReview | Objected]) -> Proposed:
+async def vp_propose(ctx: StepContext[State, Deps, VpReview | Objected]) -> Proposed | HumanReview:
     """The VP agent proposes approve or reject; on later rounds it answers the critic's objections."""
     s, r = ctx.state, ctx.inputs
     assert s.doc is not None
@@ -202,9 +215,12 @@ async def vp_propose(ctx: StepContext[State, Deps, VpReview | Objected]) -> Prop
     if round_ == 0:
         s.review_brief = reviewers.case_brief(r.invoice, r.findings, r.usd_total)
     objections = list(r.objections) if isinstance(r, Objected) else []
-    p, s.vp_history = await reviewers.propose(
-        s.doc, ctx.deps.settings, s.review_brief, objections, s.vp_history, round_
-    )
+    try:
+        p, s.vp_history = await reviewers.propose(
+            s.doc, ctx.deps.settings, s.review_brief, objections, s.vp_history, round_
+        )
+    except UnexpectedModelBehavior as e:
+        return HumanReview(r.invoice, r.findings, r.usd_total, reason=f"vp agent failed: {e}")
     ctx.deps.tracer.log("vp_propose", round=round_, proposal=p.model_dump())
     d = Decision(kind=p.decision, actor="vp_agent", reasons=p.reasons, cited_rule_ids=p.cited_rule_ids)
     return Proposed(r.invoice, r.findings, r.usd_total, decision=d, round=round_)
@@ -220,7 +236,10 @@ async def critique(ctx: StepContext[State, Deps, Proposed]) -> Approve | Reject 
     if invented:  # checked in code: a citation must name a finding that exists
         verdict = reviewers.Critique(agrees=False, objections=[f"cited rule IDs not in the findings: {invented}"])
     else:
-        verdict = await reviewers.critique(s.doc, d.settings, s.review_brief, r.decision, r.round)
+        try:
+            verdict = await reviewers.critique(s.doc, d.settings, s.review_brief, r.decision, r.round)
+        except UnexpectedModelBehavior as e:
+            return HumanReview(r.invoice, r.findings, r.usd_total, reason=f"critic agent failed: {e}")
     d.tracer.log("critique", round=r.round, verdict=verdict.model_dump())
     if verdict.agrees:
         decision, overridden = approval.guard(r.decision, r.findings)
@@ -312,6 +331,19 @@ async def escalate(ctx: StepContext[State, Deps, HumanReview]) -> Outcome:
 
 
 @g.step
+async def extract_failed(ctx: StepContext[State, Deps, ExtractFailed]) -> Outcome:
+    """Send a document the model could not read to a human, never to payment."""
+    key = InvoiceKey("(unextracted)", ctx.state.path.name)
+    reason = ctx.inputs.reason
+    db.enqueue_inbox(
+        ctx.deps.conn, key, reason="extraction_failed", run_id=ctx.state.run_id, actor="extractor",
+        payload={"error": reason, "path": str(ctx.state.path)},
+    )  # fmt: skip
+    decision = Decision(kind="escalate", actor="extractor", reasons=[reason])
+    return Outcome(key=key, status=Status.ESCALATED, decision=decision, run_id=ctx.state.run_id)
+
+
+@g.step
 async def load_failed(ctx: StepContext[State, Deps, LoadFailed]) -> Outcome:
     """Reject a file that could not be read."""
     key = InvoiceKey("(unreadable)", ctx.state.path.name)
@@ -329,7 +361,9 @@ g.add(
     g.edge_from(load_file).to(
         g.decision().branch(g.match(Loaded).to(extract)).branch(g.match(LoadFailed).to(load_failed))
     ),
-    g.edge_from(extract).to(reconcile_step),
+    g.edge_from(extract).to(
+        g.decision().branch(g.match(Extracted).to(reconcile_step)).branch(g.match(ExtractFailed).to(extract_failed))
+    ),
     g.edge_from(reconcile_step).to(
         g.decision().branch(g.match(Reconciled).to(validate)).branch(g.match(Retry).to(retry))
     ),
@@ -341,7 +375,9 @@ g.add(
         .branch(g.match(HumanReview).to(escalate))
         .branch(g.match(Reject).to(reject))
     ),
-    g.edge_from(vp_propose).to(critique),
+    g.edge_from(vp_propose).to(
+        g.decision().branch(g.match(Proposed).to(critique)).branch(g.match(HumanReview).to(escalate))
+    ),
     g.edge_from(critique).to(
         g.decision()
         .branch(g.match(Approve).to(pay))
@@ -349,7 +385,7 @@ g.add(
         .branch(g.match(Objected).to(vp_propose))
         .branch(g.match(HumanReview).to(escalate))
     ),
-    g.edge_from(pay, reject, escalate, load_failed).to(g.end_node),
+    g.edge_from(pay, reject, escalate, load_failed, extract_failed).to(g.end_node),
 )
 graph = g.build()
 
