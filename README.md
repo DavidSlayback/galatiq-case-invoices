@@ -1,119 +1,149 @@
-# Galatiq Case: Invoice Processing Automation
+# Acme invoice agents
 
-## Background
+Acme loses **$2M a year** processing invoices by hand: a 30% error rate and a 5-day cycle. This system reads supplier invoices in any of the formats Acme receives (PDF, scanned image, plain text, pasted email, CSV, JSON, XML). It checks each one against inventory, prices, vendors and policy. An AI VP and an independent AI critic decide the judgement calls; code holds the hard rules. Then it pays, rejects with reasons, or hands the case to a person with the evidence attached. Every step lands in an append-only event ledger.
 
-Acme Corp is a PE-backed manufacturing firm losing **$2M/year** on manual invoice processing. Invoices arrive via email as PDFs in messy formats with frequent errors. Staff manually extract data, validate against a legacy inventory database (inconsistent), obtain VP approval (via email chains), and process payment (via a banking API).
-
-**Current pain points:**
-- 30% error rate
-- 5-day processing delays
-- Frustrated stakeholders
-
-## Objective
-
-Build a **multi-agent system** that automates the end-to-end invoice processing workflow. The system must run as a working prototype — not just designs or slides.
-
-## Workflow
-
-The system should handle four stages:
-
-1. **Ingestion** — Extract structured data from invoice documents (PDFs, text files). Fields include: Vendor, Amount, Items (with quantities), and Due Date. Expect unstructured text, typos, missing data, and potentially fraudulent entries.
-
-2. **Validation** — Verify extracted data against a mock inventory database (SQLite). Flag mismatches such as quantity exceeding available stock or items not found in inventory.
-
-3. **Approval** — Simulate VP-level review with rule-based decision-making (e.g., invoices over $10K require additional scrutiny). The agent should reason through approval/rejection with a reflection or critique loop.
-
-4. **Payment** — If approved, call a mock payment function. If rejected, log the rejection with reasoning.
-
-## Technical Requirements
-
-- **LLM Integration**: Use xAI's Grok as the core reasoning engine (via the xAI API at https://grok.x.ai). Other models are acceptable if you don't have an API key.
-- **Multi-Agent Orchestration**: Use a framework such as LangGraph, CrewAI, AutoGen, or a custom solution.
-- **Agent Capabilities**: Function calling / tool use, structured outputs, and self-correction loops.
-- **Runtime**: Assume no internet for external APIs — simulate everything locally.
-- **Tech Stack**: Python (preferred), with libraries like `langchain`, `crewai`, `autogen`, `pdfplumber`, `PyMuPDF`, etc. Run locally — no cloud deployment.
-
-## Provided Resources
-
-### Mock Invoice Data
-
-Sample invoices are provided in the `data/invoices/` directory in various formats (PDF, CSV, JSON, TXT). Use these as inputs for testing. The data intentionally includes a mix of clean entries and problematic ones — identifying and handling issues is part of the challenge.
-
-### Mock Inventory Database (Required Setup)
-
-Before running the system, you **must** create a local SQLite database that the validation agent will check invoices against. The sample invoices in `data/invoices/` reference specific items and quantities — your database needs to contain matching inventory records so the validation stage can flag mismatches, out-of-stock items, and unknown products.
-
-Below is a starter schema and seed data that covers the core items referenced across the provided invoices:
-
-```python
-import sqlite3
-
-conn = sqlite3.connect('inventory.db')  # Persist to file so all agents can access it
-cursor = conn.cursor()
-
-cursor.execute('CREATE TABLE IF NOT EXISTS inventory (item TEXT PRIMARY KEY, stock INTEGER)')
-cursor.execute("""
-    INSERT INTO inventory VALUES
-    ('WidgetA', 15),
-    ('WidgetB', 10),
-    ('GadgetX', 5),
-    ('FakeItem', 0)
-""")
-conn.commit()
-```
-
-**Why this matters:** The sample invoices are designed to test your validation logic against this database. For example:
-
-| Scenario | Invoice | What should happen |
+| | Today (brief) | This system (measured on the 27 test invoices) |
 |---|---|---|
-| Normal order within stock | INV-1001, INV-1004, INV-1006 | Items found, quantities valid — passes validation |
-| Quantity exceeds stock | INV-1002 (requests 20× GadgetX, only 5 in stock) | Flagged as stock mismatch |
-| Fraudulent / zero-stock item | INV-1003 (references FakeItem, 0 stock) | Flagged as out of stock or suspicious |
-| Item not in database at all | INV-1008 (SuperGizmo, MegaSprocket), INV-1016 (WidgetC) | Flagged as unknown item |
-| Invalid data | INV-1009 (negative quantity) | Flagged as data integrity issue |
+| Planted problems caught | 70% (30% error rate) | **100%**, across 27/27 expected outcomes |
+| Time per invoice | 5 days | **~26 s** automated (live Grok); escalations wait for a person |
+| Handled with no person | 0% | **78%**, on a test set deliberately full of problems |
+| Model cost per invoice | — | **~4.4¢** (Grok 4.7 at published API prices) |
 
-You may extend the seed data with additional items or columns (e.g., unit price, category) to support richer validation — the above is the minimum needed to exercise the provided test invoices. If you want your system to also validate pricing or vendor information, consider adding tables for those as well.
+The case brief is in [docs/BRIEF.md](docs/BRIEF.md).
 
-### Mock Payment API
-
-```python
-def mock_payment(vendor, amount):
-    print(f"Paid {amount} to {vendor}")
-    return {"status": "success"}
-```
-
-### Grok API Setup
-
-```python
-from xai import Grok
-
-client = Grok(api_key="your_key")
-response = client.chat.completions.create(
-    model="grok-3",
-    messages=[{"role": "user", "content": "Reason about this..."}]
-)
-```
-
-## Running the System
-
-The system should be executable from the command line:
+## Quickstart
 
 ```bash
-python main.py --invoice_path=data/invoices/invoice1.txt
+uv sync                                                              # Python 3.14; one command
+uv run python main.py --invoice_path=data/invoices/invoice_1012.txt  # the brief's entry point
+uv run python main.py --invoice_dir data/invoices                    # a whole folder, with a summary table
+uv run python main.py eval                                           # score all 27 invoices against expected outcomes
+uv run python main.py review                                         # the human inbox (approve or reject with a note)
+uv run python main.py history INV-1004                               # the event ledger for one invoice
+uv run python main.py ui                                             # dashboard at http://localhost:8501
 ```
 
-Output should include structured logs and results.
+No API key or login is needed. With nothing configured, the system replays recorded model answers (offline mode). Live backends are picked automatically, in this order, or set with `--model`:
 
-## Evaluation Criteria
+| Backend | How to select it |
+|---|---|
+| Grok via the xAI API | `XAI_API_KEY` is set |
+| Claude via the Anthropic API | `ANTHROPIC_API_KEY` is set |
+| Grok via a Cursor plan | `cursor-agent` is installed → `cli:cursor:grok-4.7-medium-fast` |
+| Claude via a Claude plan | `claude` is installed → `cli:claude:haiku` |
+| Offline replay | none of the above, or `--offline` |
 
-- **Functionality** — Does the system work end-to-end?
-- **Code Quality** — Clean, testable, well-structured code with error handling and observability
-- **Agentic Sophistication** — LLM integration, multi-agent flow, tool use, self-correction loops
-- **Shipping Mindset** — Valuable MVP delivered under ambiguity; scope ruthlessly cut where needed
-- **Presentation** — Clear translation of technical decisions to business impact
-- **Above/Beyond** - Have you made it your own? Implemented additional features that make the solution feel great? Expanded assumptions? Added to test cases?
-- **UI/UX** - Users will understand and enjoy using this system.
+## How it works
 
-## Submission
+```mermaid
+flowchart LR
+    F[Invoice file] --> L[Load<br/>format parsers]
+    L --> X[Extraction agent<br/>copies values as written]
+    X --> N[Normalise in code<br/>dates, amounts, SKUs]
+    N --> R{Totals<br/>reconcile?}
+    R -- no, retry ≤2 with the numbers --> X
+    R -- yes, or still wrong → finding --> D{Ledger:<br/>seen before?}
+    D -- duplicate --> SKIP[Skipped, never paid twice]
+    D -- new or revision --> V[32 validation rules<br/>stock, prices, dates,<br/>vendor risk, fraud]
+    V --> T{Route}
+    T -- hard failure --> REJ[Reject with reasons]
+    T -- clean, < $10K --> PAY[Pay once]
+    T -- fraud, vendor change,<br/>> $50K --> H[Human inbox]
+    T -- judgement call --> VP[VP agent proposes]
+    VP --> C{Critic agent<br/>agrees?}
+    C -- yes --> G[Guardrail:<br/>no approval with a hard finding] --> PAY
+    C -- objects, round < 2 --> VP
+    C -- deadlock --> H
+    H -- note + approve --> PAY
+```
 
-Submit your solution as a link to a public GitHub repository — GitHub only (github.com).
+The full state graph is generated from the code: [docs/graph.mmd](docs/graph.mmd).
+
+- **Agents, typed:** PydanticAI agents with structured output, orchestrated by a pydantic-graph state machine.
+  - The **extraction agent** copies each value as written; code parses it, so the arithmetic and date logic is exact and identical across models.
+  - The **VP agent** proposes approve or reject, citing rule IDs.
+  - An independent **critic agent** checks the proposal. Code verifies that every cited rule exists.
+- **Two self-correction loops:**
+  - When the totals don't reconcile, the extractor is shown the specific numbers and asked again.
+  - The VP answers the critic's objections for up to two rounds.
+- **Rules in code, judgement in agents:** 32 rules with stable IDs ([docs/RULES.md](docs/RULES.md)).
+  - Hard rules reject before any agent sees the invoice, and a guardrail makes approving with a hard finding impossible, for humans too.
+  - Fraud signals and vendor-master changes always go to a person.
+- **Untrusted input:**
+  - Invoice text is data, never instructions: injected "approve this" text is caught by a rule whatever the model does.
+  - XML entities, decoy PDF text layers, oversized scans and 300-page PDFs are refused or capped.
+  - The CLI backends run sandboxed: read-only, tools off, in an empty temp dir.
+- **Ledger:**
+  - Events are append-only; an UPDATE or DELETE raises.
+  - Duplicates are matched on content, not file bytes.
+  - A revised invoice supersedes the original and pays only the difference.
+
+## Results
+
+**Offline (deterministic, part of the test suite):** 27/27 ([docs/scorecard.md](docs/scorecard.md)).
+
+**Live** ([docs/live/README.md](docs/live/README.md)):
+- **Grok 4.7 via Cursor:** extraction identical to the goldens on all 27 files.
+- **Claude Haiku:** 27/27, also identical on all 27.
+- Both read the scanned PDF from its image, and both treated the prompt-injection text as data.
+
+Traps in the data, including several the brief's table doesn't mention:
+
+| Invoice | What it hides | Outcome |
+|---|---|---|
+| 1013 | Every line fits stock; the **summed** quantities (22/18/9) don't. Its total is also $50 too high | Rejected |
+| 1007 | 20 WidgetA and 15 WidgetB over stock, and a stated total that is wrong (14,750 + 885 ≠ 15,525) | Rejected |
+| 1005 | GadgetX over stock, and a vendor address of 1600 Pennsylvania Ave | Rejected; fraud signal recorded |
+| 1012 | OCR noise (`2O26`), a renamed vendor, and $9,975, just under the limit | Sent to a person ("vendor change") |
+| 1004 R1 | A revision arriving after the original was paid | Superseded; only the +$4,050 difference goes to a person |
+| 1011, 1012, 1013 | The same invoice as both PDF and text | Second copy skipped |
+| adversarial/ | Prompt injection, split invoices, look-alike vendor, new bank details | All sent to a person, labelled "suspected fraud" |
+
+## Business impact
+
+The dashboard's **Business impact** page projects annual cost and cycle time from the measured rates, using editable, labelled assumptions. The brief gives no invoice volume, so none is presented as fact. At an assumed 40,000 invoices a year, 15 minutes per human review and $60/hour, annual cost falls from $2M to about $135K. Most of that is human review of the 22% of invoices escalated in the problem-heavy test set.
+
+![Business impact](docs/img/roi.png)
+
+| Process | Review inbox |
+|---|---|
+| ![Process](docs/img/process.png) | ![Inbox](docs/img/inbox.png) |
+
+## Decisions and trade-offs
+
+Every decision, its reason, and whether David or the agent made it is in [docs/DECISIONS.md](docs/DECISIONS.md). The ones that shape the system:
+
+- **The stock check is literal (D1).** The invoices are bills *to* Acme, so in production this would be a purchase-order and receipt three-way match. The brief asks for a stock check, and that is what is built.
+- **No partial payment (D4).** An invoice with any bad line is rejected whole, and the notice names the line.
+- **Tiers (D7):** hard → reject; fraud or more than $50K → person; $10K–$50K or a soft flag → VP and critic; otherwise automatic.
+- **Vendor-master changes go to a person (D33).** Both live models approved the renamed vendor; who gets paid is not a model's call.
+- **Models (D31, D32):** any PydanticAI provider, or Grok and Claude through their CLIs on existing subscriptions, with offline replay as the fallback.
+
+## Limitations and next steps
+
+- **Purchase-order matching.** Replace the literal stock check with a PO and goods-received three-way match.
+- **Stock reservation.** Approved invoices don't consume stock (D3), so every invoice is checked against the seeded stock.
+- **Payment idempotency at the bank.** The ledger is idempotent, but a crash between the bank call and the ledger write could double-pay. A real bank API needs an idempotency key.
+- **Scale.** SQLite and one process are fine for a prototype; production needs a queue and Postgres.
+- **The test set is small.** It has 27 invoices, deliberately full of problems, so the measured rates are evidence, not a forecast.
+
+## Repository map
+
+```
+main.py                    entry point (Typer CLI)
+invoice_agents/
+  graph.py                 the pydantic-graph state machine
+  agents/                  extractor, VP and critic agents; offline replay; subscription CLI bridge
+  loaders/                 TXT, CSV, JSON, XML, PDF and scanned-PDF (OCR or vision) loaders
+  normalize.py reconcile.py  as-written → typed invoice; arithmetic self-check
+  rules.py vendors.py      validation rules; vendor matching and risk score
+  approval.py payment.py   routing and guardrail; idempotent payment
+  ledger.py db.py inbox.py duplicates and revisions; append-only events; human review
+  eval.py telemetry.py roi.py
+app/                       Streamlit dashboard
+eval/expected_outcomes.yaml  expected outcome for every test invoice
+fixtures/golden/           recorded model answers for offline mode
+docs/                      brief, PRD, decisions, rules, live results, plan and tickets
+```
+
+Checks: `scripts/check-all` (ruff, pyright strict, 250+ tests including the offline eval), also run as a pre-commit hook.
