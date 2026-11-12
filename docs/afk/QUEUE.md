@@ -1,6 +1,6 @@
 # Queue
 
-**Frontier:** 16, then 19.
+**Frontier:** 19.
 
 | # | Ticket | Wave | Lane | Status |
 |---|---|---|---|---|
@@ -19,7 +19,7 @@
 | 13 | [vendor-risk](tickets/13-vendor-risk.md) | 6 | vendors | done (#14) |
 | 14 | [adversarial](tickets/14-adversarial.md) | 7 | adversarial | done (#16) |
 | 15 | [ocr-chain](tickets/15-ocr-chain.md) | 5 | ocr | done (#11) |
-| 16 | [cost-roi](tickets/16-cost-roi.md) | 9 | serial | todo |
+| 16 | [cost-roi](tickets/16-cost-roi.md) | 9 | serial | done |
 | 17 | [model-bridge](tickets/17-model-bridge.md) | 5 | models | done (#12) |
-| 18 | [live-model-pass](tickets/18-live-model-pass.md) | 8 | serial | done |
+| 18 | [live-model-pass](tickets/18-live-model-pass.md) | 8 | serial | done (#18) |
 | 19 | [presentation](tickets/19-presentation.md) | 10 | serial | todo |

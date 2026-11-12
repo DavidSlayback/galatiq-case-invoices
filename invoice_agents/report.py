@@ -10,6 +10,7 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
+from invoice_agents import telemetry
 from invoice_agents.inbox import Item
 from invoice_agents.models import Outcome, Status
 
@@ -46,15 +47,22 @@ def outcome_panel(o: Outcome) -> Panel:
     return Panel(Group(*parts), title=title, title_align="left")
 
 
-def summary_table(outcomes: list[Outcome]) -> Table:
-    """One row per processed file."""
-    t = Table("File", "Invoice", "Vendor", "Total", "Status", "Decided by", "Flags", title="Batch summary")
+def summary_table(outcomes: list[Outcome], runs_dir: Path | None = None, model: str | None = None) -> Table:
+    """One row per processed file, with time and API-equivalent model cost when traces are available."""
+    t = Table("File", "Invoice", "Vendor", "Total", "Status", "Decided by", "Flags", "s", "$", title="Batch summary")
     for o in outcomes:
+        u = telemetry.usage(runs_dir / f"{o.run_id}.jsonl") if runs_dir else None
+        c = u.cost(model) if u else None
+        secs, dollars = (
+            (f"{u.seconds:.1f}" if u else "-"),
+            ("unknown" if u and c is None else f"{c}" if c is not None else "-"),
+        )
         total = f"{o.invoice.total} {o.invoice.currency}" if o.invoice and o.invoice.total is not None else "-"
         flags = ", ".join(sorted({f.rule_id for f in o.findings if f.severity != "note"})) or "-"
         t.add_row(
             Path(o.source_path or "").name, o.key.invoice_number, o.key.vendor, total,
             Text(o.status.value, style=STATUS_STYLE.get(o.status, "")), o.decision.actor if o.decision else "-", flags,
+            secs, dollars,
         )  # fmt: skip
     counts = Counter(o.status.value for o in outcomes)
     t.caption = "  ".join(f"{k}: {v}" for k, v in sorted(counts.items()))

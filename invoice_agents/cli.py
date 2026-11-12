@@ -160,7 +160,7 @@ def batch(
         except BackendQuotaError as e:
             console.print(f"[red]Stopped: {e}[/red]")
             raise typer.Exit(3) from e
-    console.print(summary_table(outcomes))
+    console.print(summary_table(outcomes, s.runs_dir, s.model))
 
 
 @app.command()

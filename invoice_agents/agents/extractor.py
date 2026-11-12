@@ -53,6 +53,7 @@ class Extraction:
     raw: RawExtraction
     messages: list[ModelMessage]
     model_name: str
+    tokens: tuple[int, int] = (0, 0)
 
 
 def prompt(doc: RawDocument, feedback: str | None) -> str:
@@ -92,4 +93,6 @@ async def extract(
         user = [user, *(BinaryContent(data=png, media_type="image/png") for png in doc.page_images)]
     result = await extractor.run(user, model=model, message_history=history or None)
     name = model if isinstance(model, str) else model.model_name
-    return Extraction(to_invoice(result.output), result.output, result.all_messages(), name)
+    u = result.usage
+    tokens = (u.input_tokens, u.output_tokens)
+    return Extraction(to_invoice(result.output), result.output, result.all_messages(), name, tokens)

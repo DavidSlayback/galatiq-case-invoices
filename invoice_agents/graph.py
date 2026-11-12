@@ -151,7 +151,11 @@ async def extract(ctx: StepContext[State, Deps, Loaded]) -> Extracted | ExtractF
         return ExtractFailed(f"extraction failed: {e}")
     s.history, s.model_name = result.messages, result.model_name
     ctx.deps.tracer.log(
-        "extract", attempt=s.attempt, model=result.model_name, invoice=result.invoice.model_dump(mode="json")
+        "extract",
+        attempt=s.attempt,
+        model=result.model_name,
+        tokens=result.tokens,
+        invoice=result.invoice.model_dump(mode="json"),
     )
     return Extracted(result.invoice)
 
@@ -289,12 +293,12 @@ async def vp_propose(ctx: StepContext[State, Deps, VpReview | Objected]) -> Prop
         s.review_brief = reviewers.case_brief(r.invoice, r.findings, r.usd_total)
     objections = list(r.objections) if isinstance(r, Objected) else []
     try:
-        p, s.vp_history = await reviewers.propose(
+        p, s.vp_history, vp_tokens = await reviewers.propose(
             s.doc, ctx.deps.settings, s.review_brief, objections, s.vp_history, round_
         )
     except UnexpectedModelBehavior as e:
         return HumanReview(r.invoice, r.findings, r.usd_total, reason=f"vp agent failed: {e}")
-    ctx.deps.tracer.log("vp_propose", round=round_, proposal=p.model_dump())
+    ctx.deps.tracer.log("vp_propose", round=round_, proposal=p.model_dump(), tokens=vp_tokens)
     d = Decision(kind=p.decision, actor="vp_agent", reasons=p.reasons, cited_rule_ids=p.cited_rule_ids)
     return Proposed(r.invoice, r.findings, r.usd_total, decision=d, round=round_)
 
@@ -308,12 +312,13 @@ async def critique(ctx: StepContext[State, Deps, Proposed]) -> Approve | Reject 
     invented = [i for i in r.decision.cited_rule_ids if i not in known]
     if invented:  # checked in code: a citation must name a finding that exists
         verdict = reviewers.Critique(agrees=False, objections=[f"cited rule IDs not in the findings: {invented}"])
+        critic_tokens = (0, 0)
     else:
         try:
-            verdict = await reviewers.critique(s.doc, d.settings, s.review_brief, r.decision, r.round)
+            verdict, critic_tokens = await reviewers.critique(s.doc, d.settings, s.review_brief, r.decision, r.round)
         except UnexpectedModelBehavior as e:
             return HumanReview(r.invoice, r.findings, r.usd_total, reason=f"critic agent failed: {e}")
-    d.tracer.log("critique", round=r.round, verdict=verdict.model_dump())
+    d.tracer.log("critique", round=r.round, verdict=verdict.model_dump(), tokens=critic_tokens)
     if verdict.agrees:
         decision, overridden = approval.guard(r.decision, r.findings)
         if overridden:

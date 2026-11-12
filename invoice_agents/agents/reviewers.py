@@ -79,17 +79,22 @@ async def propose(
     objections: list[str],
     history: list[ModelMessage],
     round_: int,
-) -> tuple[Proposal, list[ModelMessage]]:
+) -> tuple[Proposal, list[ModelMessage], tuple[int, int]]:
     """One VP proposal; on later rounds the critic's objections are included."""
     prompt = brief if not objections else "The auditor objected:\n" + "\n".join(f"- {o}" for o in objections)
     model = resolve(settings, "vp", doc, round_)
     r = await vp_agent.run(prompt, model=model, message_history=history or None)
-    return r.output, r.all_messages()
+    u = r.usage
+    return r.output, r.all_messages(), (u.input_tokens, u.output_tokens)
 
 
-async def critique(doc: RawDocument, settings: Settings, brief: str, proposal: Decision, round_: int) -> Critique:
+async def critique(
+    doc: RawDocument, settings: Settings, brief: str, proposal: Decision, round_: int
+) -> tuple[Critique, tuple[int, int]]:
     """The critic's independent check of one proposal (fresh context each round)."""
     vp = proposal.model_dump(include={"kind", "reasons", "cited_rule_ids"})
     prompt = f"{brief}\n\nVP decision:\n{json.dumps(vp)}"
     model = resolve(settings, "critic", doc, round_)
-    return (await critic_agent.run(prompt, model=model)).output
+    r = await critic_agent.run(prompt, model=model)
+    u = r.usage
+    return r.output, (u.input_tokens, u.output_tokens)

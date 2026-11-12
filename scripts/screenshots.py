@@ -63,7 +63,7 @@ def main() -> None:
                 wait_ready(page)
                 time.sleep(3)  # data grids paint on a canvas after the script finishes
                 page.screenshot(path=OUT / "process.png", full_page=True)
-                for path, name in [("inbox", "inbox"), ("history", "history")]:
+                for path, name in [("inbox", "inbox"), ("history", "history"), ("roi", "roi")]:
                     page.goto(f"{base}/{path}")
                     wait_ready(page)
                     time.sleep(3)

@@ -16,6 +16,7 @@ nav = st.navigation(
         st.Page(PAGES / "inbox.py", title="Review inbox", icon=":material/inbox:"),
         st.Page(PAGES / "history.py", title="History", icon=":material/history:"),
         st.Page(PAGES / "batch.py", title="Run all samples", icon=":material/fact_check:"),
+        st.Page(PAGES / "roi.py", title="Business impact", icon=":material/trending_down:"),
     ]
 )
 nav.run()
