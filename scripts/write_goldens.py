@@ -188,6 +188,8 @@ EXTRACT: dict[str, dict[str, Any]] = {
         **SUMMIT, lines=SUMMIT_LINES, subtotal="$3,000.00", tax="$0.00", total="$3,000.00", payment_terms="Net 30"
     ),
     "invoice_1011.pdf": dict(**SUMMIT, lines=SUMMIT_LINES, total="$3,000.00"),
+    # Image-only copy of the 1011 PDF (scripts/make_scan.py): same content as the PDF golden.
+    "scans/invoice_1011_scan.pdf": dict(**SUMMIT, lines=SUMMIT_LINES, total="$3,000.00"),
     "invoice_1012.txt": QUICKSHIP,
     "invoice_1012.pdf": QUICKSHIP,
     "invoice_1013.json": dict(

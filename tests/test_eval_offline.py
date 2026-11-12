@@ -6,7 +6,7 @@ from invoice_agents.settings import Settings
 
 def test_offline_eval_passes(tmp_path: Path):
     rows = eval_mod.run(Settings(model="offline", offline=True, runs_dir=tmp_path))
-    assert len(rows) == 20
+    assert len(rows) == 21
     assert [r.path for r in eval_mod.failures(rows)] == []
 
 

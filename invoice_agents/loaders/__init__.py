@@ -66,8 +66,11 @@ def load(path: Path) -> RawDocument:
     if not data.strip():
         raise LoadError(f"empty file: {path}")
     try:
-        return loader(path, data, file_sha256(data))
+        doc = loader(path, data, file_sha256(data))
     except LoadError:
         raise
     except Exception as e:  # any parser failure on untrusted input becomes a typed error
         raise LoadError(f"malformed {path.suffix} file {path.name}: {e}") from e
+    if not doc.text.strip() and not doc.page_images:
+        raise LoadError(f"no readable content in {path.name}")
+    return doc

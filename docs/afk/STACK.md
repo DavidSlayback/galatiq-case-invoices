@@ -10,4 +10,5 @@
 | 08 | afk/08-payment | afk/06-rules | #7 | PASS ([evidence](evidence/08.md)) |
 | 07 | afk/07-approval | afk/08-payment | #8 | PASS ([evidence](evidence/07.md)) |
 | 05 | afk/05-extraction-agent | afk/07-approval | #9 | PASS after fix round ([evidence](evidence/05.md)) |
-| 09 | afk/09-eval | afk/05-extraction-agent | | PASS ([evidence](evidence/09.md)) |
+| 09 | afk/09-eval | afk/05-extraction-agent | #10 | PASS ([evidence](evidence/09.md)) |
+| 15 | afk/15-ocr-chain | afk/09-eval | | verifying ([evidence](evidence/15.md)) |

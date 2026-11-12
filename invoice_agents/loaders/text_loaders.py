@@ -9,6 +9,7 @@ from typing import Any
 import pdfplumber
 from defusedxml.ElementTree import fromstring as safe_fromstring
 
+from invoice_agents.loaders import ocr
 from invoice_agents.models import RawDocument
 
 
@@ -112,6 +113,12 @@ def load_pdf(path: Path, data: bytes, sha: str) -> RawDocument:
     with pdfplumber.open(io.BytesIO(data)) as pdf:
         pages = [p.extract_text(layout=True) or "" for p in pdf.pages]
     text = "\n\n".join(t.rstrip() for t in pages).strip()
-    if not text:
-        raise ValueError("no text layer")
-    return RawDocument(path=str(path), file_sha256=sha, format="pdf", text=text)
+    if text:
+        return RawDocument(path=str(path), file_sha256=sha, format="pdf", text=text)
+    # No text layer: a scan. Local OCR first, page images kept for the vision model (D16).
+    res = ocr.scan(data)
+    if not res.images:
+        raise ValueError("PDF has no pages")
+    return RawDocument(
+        path=str(path), file_sha256=sha, format="pdf", text=res.text, fields={"ocr": res.note}, page_images=res.images
+    )

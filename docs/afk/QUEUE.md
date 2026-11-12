@@ -12,13 +12,13 @@
 | 06 | [rules](tickets/06-rules.md) | 3 | rules | done (#6) |
 | 07 | [approval](tickets/07-approval.md) | 3 | approval | done (#8) |
 | 08 | [payment](tickets/08-payment.md) | 3 | payment | done (#7) |
-| 09 | [eval](tickets/09-eval.md) | 5 | serial | done |
+| 09 | [eval](tickets/09-eval.md) | 5 | serial | done (#10) |
 | 10 | [ledger-batch](tickets/10-ledger-batch.md) | 6 | ledger | todo |
 | 11 | [inbox-cli](tickets/11-inbox-cli.md) | 7 | inbox | todo |
 | 12 | [streamlit](tickets/12-streamlit.md) | 8 | serial | todo |
 | 13 | [vendor-risk](tickets/13-vendor-risk.md) | 6 | vendors | todo |
 | 14 | [adversarial](tickets/14-adversarial.md) | 7 | adversarial | todo |
-| 15 | [ocr-chain](tickets/15-ocr-chain.md) | 5 | ocr | todo |
+| 15 | [ocr-chain](tickets/15-ocr-chain.md) | 5 | ocr | verifying |
 | 16 | [cost-roi](tickets/16-cost-roi.md) | 9 | serial | todo |
 | 17 | [model-bridge](tickets/17-model-bridge.md) | 5 | models | todo |
 | 18 | [live-model-pass](tickets/18-live-model-pass.md) | 8 | serial | todo (uses subscription quota, D31) |

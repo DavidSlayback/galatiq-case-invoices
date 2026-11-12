@@ -3,8 +3,8 @@
 import json
 from dataclasses import dataclass
 
-from pydantic_ai import Agent, ModelRetry
-from pydantic_ai.messages import ModelMessage
+from pydantic_ai import Agent, BinaryContent, ModelRetry
+from pydantic_ai.messages import ModelMessage, UserContent
 from pydantic_ai.models import Model
 
 from invoice_agents.agents.models import resolve
@@ -60,7 +60,10 @@ def prompt(doc: RawDocument, feedback: str | None) -> str:
     parts = [f"Format: {doc.format}"]
     if doc.fields:
         parts.append(f"Fields a parser read directly (may be partial):\n{json.dumps(doc.fields, default=str)}")
-    parts.append(f"<document>\n{doc.text}\n</document>")
+    if doc.text.strip():
+        parts.append(f"<document>\n{doc.text}\n</document>")
+    else:
+        parts.append("The document is a scanned image with no text layer; read it from the attached page images.")
     if feedback:
         parts.append(
             "Your previous extraction does not reconcile:\n"
@@ -83,6 +86,10 @@ async def extract(
         attempt: 0-based attempt number (offline replay uses it to pick a scripted answer).
     """
     model: Model | str = resolve(settings, "extract", doc, attempt)
-    result = await extractor.run(prompt(doc, feedback), model=model, message_history=history or None)
+    user: str | list[UserContent] = prompt(doc, feedback)
+    if doc.page_images and not doc.text.strip():
+        # A scan with no trusted OCR text: the model reads the page images itself (D16).
+        user = [user, *(BinaryContent(data=png, media_type="image/png") for png in doc.page_images)]
+    result = await extractor.run(user, model=model, message_history=history or None)
     name = model if isinstance(model, str) else model.model_name
     return Extraction(to_invoice(result.output), result.output, result.all_messages(), name)

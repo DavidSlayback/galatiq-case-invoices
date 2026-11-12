@@ -108,7 +108,14 @@ async def load_file(ctx: StepContext[State, Deps, Path]) -> Loaded | LoadFailed:
         ctx.deps.tracer.log("load", path=str(ctx.inputs), error=str(e))
         return LoadFailed(str(e))
     ctx.state.doc = doc
-    ctx.deps.tracer.log("load", path=doc.path, format=doc.format, sha256=doc.file_sha256)
+    ctx.deps.tracer.log(
+        "load",
+        path=doc.path,
+        format=doc.format,
+        sha256=doc.file_sha256,
+        pages=len(doc.page_images),
+        ocr=doc.fields.get("ocr"),
+    )
     return Loaded(doc)
 
 

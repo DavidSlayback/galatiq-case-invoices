@@ -108,3 +108,8 @@ data/invoices/invoice_1016.json:
   status: rejected
   requires: [UNKNOWN_ITEM]
   why: WidgetC is not in inventory; the whole invoice is rejected, not short-paid (D4).
+
+data/invoices/scans/invoice_1011_scan.pdf:
+  status: duplicate_skipped
+  pending: ledger
+  why: Image-only copy of 1011, read through OCR or the vision model (D16); same invoice as the PDF, so it is never paid twice.
