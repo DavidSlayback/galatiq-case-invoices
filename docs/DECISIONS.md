@@ -7,7 +7,7 @@ Decisions from the grilling session on 2026-11-12. Each one comes from David unl
 | # | Decision | Why / consequence |
 |---|---|---|
 | D1 (B-1) | Check stock literally: quantity ≤ stock. The README adds one sentence: "read as a goods-received check; production would do a PO / receipt three-way match." | Matches the brief's expected outcomes. The invoices are bills to Acme ("Bill To: Acme", "Attn: Accounts Payable"), so Acme is the buyer. |
-| D2 (B-2) | Keep a ledger keyed by vendor + invoice number. A copy with the same content is skipped as a duplicate. A higher revision replaces the original if it is unpaid; if the original was paid, pay only the difference or escalate. | Never pay twice (1011–1013 come in two formats; 1004 has a revision R1). |
+| D2 (B-2) | Keep a ledger keyed by vendor + invoice number. A copy with the same content is skipped as a duplicate. A higher revision replaces the original if it is unpaid; if the original was paid, pay only the difference or escalate. Every replacement and every skipped duplicate is written to the event ledger (D25). | Never pay twice (1011–1013 come in two formats; 1004 has a revision R1). |
 | D3 (B-3) | Do not consume stock. Every invoice is checked against the seeded stock. | Outcomes don't depend on batch order. The README notes that production would reserve stock. |
 | D4 (B-4) | No partial approval. Reject the whole invoice; the rejection notice lists the bad lines. | Accounts payable doesn't short-pay without a credit note (1016). |
 | D5 (B-5) | Convert currency with a fixed, dated mock rate table, then apply the normal rules. Foreign currency is a note, not a flag. | 1014 is in EUR. Works offline. |
@@ -27,7 +27,7 @@ Decisions from the grilling session on 2026-11-12. Each one comes from David unl
 | D14 (B-11) | Extraction self-correction: feed the specific mismatch back, at most 2 retries, then keep the result with an "arithmetic mismatch" finding, which validation rejects. | The LLM must not invent consistency (1009's mismatch is real). |
 | D15 (B-9, B-11) | In the VP tier, a VP agent proposes approve or reject, citing rule IDs. A separate critic agent checks it. If they still disagree after 2 rounds, a human decides. A code guardrail makes approval impossible when any hard rule failed. | The LLM has real but bounded authority (FR-3.6). |
 | D16 (B-13) | PDFs: use the text layer if present. Otherwise run Tesseract OCR, and if OCR is empty or low-confidence, fall back to a vision model. | David answered "3 then 1": local first, model last. |
-| D17 | Business data (inventory with prices, vendors, ledger, findings, decisions, payments, inbox) lives in SQLite. Per-run agent traces (prompts, tool calls, tokens, latency) go to JSONL under `runs/`. | Large trace data stays out of the database. |
+| D17 | Business data (inventory with prices, vendors, ledger, findings, decisions, payments, inbox) lives in SQLite. The business-level history is the event ledger (D25); the JSONL traces are agent-level detail. Per-run agent traces (prompts, tool calls, tokens, latency) go to JSONL under `runs/`. | Large trace data stays out of the database. |
 
 ## Product
 
@@ -40,6 +40,12 @@ Decisions from the grilling session on 2026-11-12. Each one comes from David unl
 | D22 (B-17) | Build order: (1) core graph, CLI and seeded database; (2) eval on the 17 original invoices; (3) ledger and inbox; (4) Streamlit; (5) vendor risk, adversarial files, OCR chain, ROI. If time runs short, cut from the end. | Correctness is proven early. |
 | D23 | Tooling: uv, ruff, pyright and pytest, with pre-commit as the local gate. Use the highest Python version every dependency supports: try 3.14 first and step down only if a wheel is missing. | David asked for the newest Python. |
 | D24 | Presentation: a README (quickstart, generated Mermaid graph, this decision log, eval scorecard, ROI, limitations), a demo video, and a Claude Artifact in place of a slide deck. | The graders score presentation and business impact. |
+
+## Added 2026-11-12 (after the grilling)
+
+| # | Decision | Why / consequence |
+|---|---|---|
+| D25 | An append-only `invoice_events` table in SQLite is the audit history. It records `received`, `duplicate_skipped`, `superseded`, `validated`, `decided`, `escalated`, `human_decision`, `paid` and `payment_failed`. Each event carries the invoice key, revision, actor (agent, rule or human), a timestamp, the trace id and a JSON payload. A `superseded` event names the old and new revision and gives the line and amount differences and the reason. Each step appends its event and updates a current-status row in the same transaction. A trigger blocks UPDATE and DELETE on events. `main.py history INV-x` and the Streamlit trace view read the events. | David: replacements must be logged and referable. A state table alongside the events keeps the inbox and other queries simple. |
 
 ## Agent choices (not decided by David; flag if wrong)
 

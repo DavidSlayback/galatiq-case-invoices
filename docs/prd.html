@@ -93,6 +93,7 @@ footer{font-size:.85rem;color:var(--muted);border-top:1px solid var(--rule);padd
   <tr><th>Area</th><th>Decision</th></tr>
   <tr><td class="id">Stock</td><td>Check quantity ≤ stock exactly as the brief says, with a one-line README caveat about PO matching. Approvals don't consume stock.</td></tr>
   <tr><td class="id">Duplicates</td><td>A ledger keyed by vendor + invoice number. Same-content copies are skipped; a higher revision replaces an unpaid original.</td></tr>
+  <tr><td class="id">History</td><td>An append-only <code>invoice_events</code> ledger records every receipt, duplicate, replacement (old → new revision, with the differences and reason), decision and payment. It is written in the same transaction as the current-status row and can't be edited.</td></tr>
   <tr><td class="id">Bad lines</td><td>Reject the whole invoice and list the bad lines. No partial payment.</td></tr>
   <tr><td class="id">Currency</td><td>Fixed, dated mock exchange rate, then the normal rules.</td></tr>
   <tr><td class="id">Price</td><td>More than 5% above catalog is a soft flag; discounts are noted only.</td></tr>
