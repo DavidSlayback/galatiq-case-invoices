@@ -1,5 +1,5 @@
 # Checkpoint
 
-Last completed: 19 (afk/19-presentation). Queue exhausted. Next: close-out (refine, merge stack bottom-up, evidence-ledger gate, retro).
-Resume: read docs/afk/QUEUE.md and STACK.md, `gh stack view`, then `gh stack add afk/<next>` and continue.
-Helpers: gh 2.46 `pr edit` fails (Projects classic); set PR bodies through the REST PATCH endpoint.
+State: done. All 19 tickets plus the close-out fixes were merged to main at 2b73626 on 2026-11-12.
+Nothing in flight. Optional human items: `sudo apt install tesseract-ocr`; an xAI key to run the xAI API path live.
+To resume any follow-up: read docs/afk/REPORT.md (follow-ups) and docs/DECISIONS.md.

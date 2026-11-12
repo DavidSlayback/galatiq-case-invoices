@@ -1,6 +1,6 @@
 # Queue
 
-**Frontier:** none. All 19 tickets done; next is close-out.
+**Frontier:** none. All tickets merged to main at 2b73626.
 
 | # | Ticket | Wave | Lane | Status |
 |---|---|---|---|---|
