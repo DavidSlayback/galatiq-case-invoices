@@ -4,11 +4,14 @@ Loaders never interpret or execute content; they only read it.
 """
 
 import hashlib
+import stat
 from collections.abc import Callable
 from pathlib import Path
 
 from invoice_agents.loaders import json_loader, text_loaders
 from invoice_agents.models import RawDocument
+
+MAX_BYTES = 20 * 1024 * 1024
 
 
 class LoadError(Exception):
@@ -47,6 +50,15 @@ def load(path: Path) -> RawDocument:
     loader = _LOADERS.get(path.suffix.lower())
     if loader is None:
         raise LoadError(f"unsupported file type: {path.suffix or '(none)'}")
+    try:
+        st = path.stat()
+    except OSError as e:
+        raise LoadError(f"cannot read {path}: {e}") from e
+    # Only regular files: a FIFO or device with an invoice suffix would block or stream forever.
+    if not stat.S_ISREG(st.st_mode):
+        raise LoadError(f"not a regular file: {path}")
+    if st.st_size > MAX_BYTES:
+        raise LoadError(f"file too large ({st.st_size} bytes; limit {MAX_BYTES})")
     try:
         data = path.read_bytes()
     except OSError as e:

@@ -5,6 +5,7 @@ description = "Multi-agent invoice processing prototype for Acme Corp (Galatiq c
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
+    "defusedxml>=0.7.1",
     "pdfplumber>=0.11.10",
     "pydantic-ai-slim[anthropic,openai]>=2.68.0",
     "pydantic-graph>=2.68.0",
@@ -22,6 +23,7 @@ dev = [
     "pyright>=1.1.414",
     "pytest>=9.2.0",
     "ruff>=0.17.4",
+    "types-defusedxml>=0.7.0.20260504",
 ]
 
 [tool.ruff]

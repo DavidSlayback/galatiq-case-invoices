@@ -7,20 +7,22 @@ from pathlib import Path
 from typing import Any
 
 import pdfplumber
+from defusedxml.ElementTree import fromstring as safe_fromstring
 
 from invoice_agents.models import RawDocument
 
 
-def _decode(data: bytes) -> str:
+def decode(data: bytes) -> str:
+    """UTF-8 (BOM-tolerant, as Excel writes it), falling back to Latin-1."""
     try:
-        return data.decode("utf-8")
+        return data.decode("utf-8-sig")
     except UnicodeDecodeError:
         return data.decode("latin-1")
 
 
 def load_txt(path: Path, data: bytes, sha: str) -> RawDocument:
     """Plain text (including pasted emails): passed through for the extractor."""
-    text = _decode(data)
+    text = decode(data)
     if "\x00" in text:
         raise ValueError("binary content in a text file")
     return RawDocument(path=str(path), file_sha256=sha, format="txt", text=text)
@@ -33,24 +35,26 @@ def _kv_csv(rows: list[list[str]]) -> dict[str, Any]:
     for row in rows[1:]:
         if len(row) < 2:
             continue
-        k, v = row[0].strip(), row[1].strip()
+        k, v = row[0].strip().lower(), row[1].strip()
         if k == "item":
             lines.append({"item": v})
         elif k in ("quantity", "unit_price") and lines:
             lines[-1][k] = v
+        elif k in fields and fields[k] != v:
+            fields.setdefault("conflicting_keys", []).append(k)  # keep the first value; flag the clash
         else:
-            fields[k] = v
+            fields.setdefault(k, v)
     fields["line_items"] = lines
     return fields
 
 
 def _row_csv(rows: list[list[str]]) -> dict[str, Any]:
     """One row per line plus footer rows whose label sits in a value column (1007, 1015)."""
-    header = [h.strip() for h in rows[0]]
+    header = [h.strip().title() for h in rows[0]]
     fields: dict[str, Any] = {"line_items": []}
     for row in rows[1:]:
         rec = dict(zip(header, (c.strip() for c in row), strict=False))
-        if rec.get("Invoice Number"):
+        if rec.get("Invoice Number") and rec.get("Item"):
             fields.setdefault("invoice_number", rec["Invoice Number"])
             fields.setdefault("vendor", rec.get("Vendor"))
             fields.setdefault("date", rec.get("Date"))
@@ -72,7 +76,7 @@ def _row_csv(rows: list[list[str]]) -> dict[str, Any]:
 
 def load_csv(path: Path, data: bytes, sha: str) -> RawDocument:
     """CSV in either sample layout; unrecognised headers keep only the text."""
-    text = _decode(data)
+    text = decode(data)
     rows = [r for r in csv.reader(io.StringIO(text)) if any(c.strip() for c in r)]
     if not rows:
         raise ValueError("no rows")
@@ -96,13 +100,11 @@ def _xml_to_obj(el: ET.Element) -> Any:
 
 
 def load_xml(path: Path, data: bytes, sha: str) -> RawDocument:
-    """XML with DTDs refused (no entity expansion from untrusted input)."""
-    if b"<!DOCTYPE" in data or b"<!ENTITY" in data:
-        raise ValueError("DTD or entity declarations are not accepted")
-    root = ET.fromstring(data)
+    """XML parsed with defusedxml: DTDs and entities are refused in any encoding."""
+    root = safe_fromstring(data, forbid_dtd=True)
     obj = _xml_to_obj(root)
     fields = obj if isinstance(obj, dict) else {"content": obj}
-    return RawDocument(path=str(path), file_sha256=sha, format="xml", text=_decode(data), fields=fields)
+    return RawDocument(path=str(path), file_sha256=sha, format="xml", text=decode(data), fields=fields)
 
 
 def load_pdf(path: Path, data: bytes, sha: str) -> RawDocument:

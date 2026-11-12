@@ -64,3 +64,55 @@ def test_malformed_inputs_raise_load_error(tmp_path: Path, name: str, content: b
 def test_missing_file(tmp_path: Path):
     with pytest.raises(LoadError):
         load(tmp_path / "nope.txt")
+
+
+def test_utf16_xml_entity_is_refused(tmp_path: Path):
+    p = tmp_path / "u16.xml"
+    p.write_bytes('<?xml version="1.0" encoding="UTF-16"?><!DOCTYPE x [<!ENTITY a "b">]><r>&a;</r>'.encode("utf-16"))
+    with pytest.raises(LoadError):
+        load(p)
+
+
+def test_fifo_is_refused_without_blocking(tmp_path: Path):
+    import os
+
+    p = tmp_path / "pipe.txt"
+    os.mkfifo(p)
+    with pytest.raises(LoadError, match="regular file"):
+        load(p)
+
+
+def test_bom_csv_still_parses(tmp_path: Path):
+    p = tmp_path / "bom.csv"
+    p.write_bytes(b"\xef\xbb\xbf" + (INVOICES / "invoice_1006.csv").read_bytes())
+    assert len(load(p).fields["line_items"]) == 2
+
+
+def test_kv_csv_keys_are_case_insensitive_and_clashes_flagged(tmp_path: Path):
+    p = tmp_path / "kv.csv"
+    p.write_text("Field,Value\nVendor,A\nvendor,B\nItem,WidgetA\nQuantity,2\n")
+    f = load(p).fields
+    assert f["vendor"] == "A" and f["conflicting_keys"] == ["vendor"]
+    assert f["line_items"] == [{"item": "WidgetA", "quantity": "2"}]
+
+
+def test_row_csv_skips_rows_without_an_item(tmp_path: Path):
+    p = tmp_path / "rows.csv"
+    p.write_text("Invoice Number,Vendor,Item,Qty\nINV-1,V\nINV-1,V,WidgetA,3\n")
+    assert load(p).fields["line_items"] == [
+        {"item": "WidgetA", "quantity": "3", "unit_price": None, "line_total": None}
+    ]
+
+
+@pytest.mark.parametrize("content", [b'{"a": NaN}', b'{"a": Infinity}'])
+def test_json_nonstandard_constants_rejected(tmp_path: Path, content: bytes):
+    p = tmp_path / "c.json"
+    p.write_bytes(content)
+    with pytest.raises(LoadError):
+        load(p)
+
+
+def test_json_with_bom_loads(tmp_path: Path):
+    p = tmp_path / "bom.json"
+    p.write_bytes(b'\xef\xbb\xbf{"invoice_number": "INV-1"}')
+    assert load(p).fields["invoice_number"] == "INV-1"
