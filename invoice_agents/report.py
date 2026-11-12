@@ -10,6 +10,7 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
+from invoice_agents.inbox import Item
 from invoice_agents.models import Outcome, Status
 
 STATUS_STYLE = {
@@ -73,3 +74,17 @@ def _brief(payload: dict[str, object]) -> str:
     keys = ("reason", "total_delta", "lines_added", "amount", "amount_due", "kind", "duplicate_of", "path")
     parts = [f"{k}={payload[k]}" for k in keys if payload.get(k) not in (None, [], "")]
     return "; ".join(parts)[:120]
+
+
+def inbox_table(items: list[Item]) -> Table:
+    """Open inbox items with what a reviewer needs to decide."""
+    t = Table("Invoice", "Vendor", "Amount", "Why here", "Risk", "Flags", "Agent reasoning", title="Inbox")
+    for i in items:
+        amount = f"{i.amount_due} due" if i.amount_due else f"{i.total or '-'} {i.currency or ''}"
+        why = Text(i.reason + (f" [{i.label}]" if i.label else ""), style="bold red" if i.label else "")
+        t.add_row(
+            i.key.invoice_number, i.key.vendor, amount, why, str(i.risk) if i.risk is not None else "-",
+            ", ".join(i.flags) or "-", " ".join(i.reasoning)[:160] or "-",
+        )  # fmt: skip
+    t.caption = f"{len(items)} open. Resolve with: main.py review INV-xxxx --approve|--reject --note '...'"
+    return t

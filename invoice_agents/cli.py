@@ -10,12 +10,12 @@ import typer
 from rich.console import Console
 
 from invoice_agents import eval as eval_mod
-from invoice_agents import graph
+from invoice_agents import graph, inbox
 from invoice_agents import settings as settings_mod
 from invoice_agents.agents.cli_bridge import BackendQuotaError
 from invoice_agents.agents.models import detect
 from invoice_agents.agents.offline import MissingFixture
-from invoice_agents.report import history_table, outcome_panel, summary_table
+from invoice_agents.report import history_table, inbox_table, outcome_panel, summary_table
 from invoice_agents.seed import open_db
 from invoice_agents.seed import reset as reset_db
 
@@ -164,9 +164,28 @@ def batch(
 
 
 @app.command()
-def review() -> None:
-    """List and resolve escalated invoices."""
-    _not_yet()
+def review(
+    invoice_number: Annotated[str | None, typer.Argument(help="Invoice to resolve; omit to list the inbox.")] = None,
+    approve: Annotated[bool, typer.Option("--approve", help="Approve and pay.")] = False,
+    reject: Annotated[bool, typer.Option("--reject", help="Reject.")] = False,
+    note: Annotated[str, typer.Option("--note", help="Required reason for the decision.")] = "",
+    db: DbOpt = None,
+) -> None:
+    """List escalated invoices, or approve/reject one with a note."""
+    conn = open_db(build_settings(None, False, None, db).db_path)
+    if invoice_number is None:
+        console.print(inbox_table(inbox.list_open(conn)))
+        return
+    if approve == reject:
+        console.print("[red]Choose exactly one of --approve or --reject.[/red]")
+        raise typer.Exit(2)
+    try:
+        with contextlib.redirect_stdout(io.StringIO()):
+            result = inbox.resolve(conn, invoice_number, approve=approve, note=note, reviewer="human:cli")
+    except inbox.InboxError as e:
+        console.print(f"[red]{e}[/red]")
+        raise typer.Exit(1) from e
+    console.print(f"[green]{invoice_number}: {result['status']}[/green] {result.get('amount', '')}")
 
 
 @app.command()
