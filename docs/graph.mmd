@@ -14,7 +14,8 @@ stateDiagram-v2
   escalate
   pay
   reject
-  vp_review
+  vp_propose
+  critique
   state decision_4 <<choice>>
 
   [*] --> load_file
@@ -31,11 +32,13 @@ stateDiagram-v2
   decision_3 --> escalate
   decision_3 --> pay
   decision_3 --> reject
-  decision_3 --> vp_review
+  decision_3 --> vp_propose
   escalate --> [*]
   pay --> [*]
   reject --> [*]
-  vp_review --> decision_4
+  vp_propose --> critique
+  critique --> decision_4
   decision_4 --> escalate
   decision_4 --> pay
   decision_4 --> reject
+  decision_4 --> vp_propose

@@ -1,6 +1,6 @@
 # Queue
 
-**Frontier:** 07, then 05. Next run: `/stacked-afk-loop` over `docs/afk/tickets/`. All 19 tickets are AFK.
+**Frontier:** 05. Next run: `/stacked-afk-loop` over `docs/afk/tickets/`. All 19 tickets are AFK.
 
 | # | Ticket | Wave | Lane | Status |
 |---|---|---|---|---|
@@ -10,8 +10,8 @@
 | 04 | [loaders](tickets/04-loaders.md) | 3 | loaders | done (#5) |
 | 05 | [extraction-agent](tickets/05-extraction-agent.md) | 4 | serial | todo |
 | 06 | [rules](tickets/06-rules.md) | 3 | rules | done (#6) |
-| 07 | [approval](tickets/07-approval.md) | 3 | approval | todo |
-| 08 | [payment](tickets/08-payment.md) | 3 | payment | done |
+| 07 | [approval](tickets/07-approval.md) | 3 | approval | done |
+| 08 | [payment](tickets/08-payment.md) | 3 | payment | done (#7) |
 | 09 | [eval](tickets/09-eval.md) | 5 | serial | todo |
 | 10 | [ledger-batch](tickets/10-ledger-batch.md) | 6 | ledger | todo |
 | 11 | [inbox-cli](tickets/11-inbox-cli.md) | 7 | inbox | todo |

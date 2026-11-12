@@ -14,8 +14,8 @@ from pydantic_ai.messages import ModelMessage
 from pydantic_graph import GraphBuilder, StepContext
 
 from invoice_agents import approval, db, fx, payment, reconcile, rules
-from invoice_agents.agents import extractor
-from invoice_agents.approval import Approve, AutoApprove, HumanReview, Reject, VpReview
+from invoice_agents.agents import extractor, reviewers
+from invoice_agents.approval import Approve, AutoApprove, HumanReview, Objected, Proposed, Reject, VpReview
 from invoice_agents.ledger import key_for
 from invoice_agents.loaders import LoadError, load
 from invoice_agents.models import (
@@ -57,6 +57,8 @@ class State:
     history: list[ModelMessage] = field(default_factory=list[ModelMessage])
     findings: list[Finding] = field(default_factory=list[Finding])
     model_name: str = ""
+    review_brief: str = ""
+    vp_history: list[ModelMessage] = field(default_factory=list[ModelMessage])
 
 
 @dataclass(frozen=True)
@@ -185,10 +187,45 @@ async def validate(ctx: StepContext[State, Deps, Reconciled]) -> approval.Route:
 
 
 @g.step
-async def vp_review(ctx: StepContext[State, Deps, VpReview]) -> Approve | Reject | HumanReview:
-    """VP review; until the VP agent exists every case goes to a human."""
-    r = ctx.inputs
-    return HumanReview(r.invoice, r.findings, r.usd_total, reason="vp review unavailable")
+async def vp_propose(ctx: StepContext[State, Deps, VpReview | Objected]) -> Proposed:
+    """The VP agent proposes approve or reject; on later rounds it answers the critic's objections."""
+    s, r = ctx.state, ctx.inputs
+    assert s.doc is not None
+    round_ = r.round + 1 if isinstance(r, Objected) else 0
+    if round_ == 0:
+        s.review_brief = reviewers.case_brief(r.invoice, r.findings, r.usd_total)
+    objections = list(r.objections) if isinstance(r, Objected) else []
+    p, s.vp_history = await reviewers.propose(
+        s.doc, ctx.deps.settings, s.review_brief, objections, s.vp_history, round_
+    )
+    ctx.deps.tracer.log("vp_propose", round=round_, proposal=p.model_dump())
+    d = Decision(kind=p.decision, actor="vp_agent", reasons=p.reasons, cited_rule_ids=p.cited_rule_ids)
+    return Proposed(r.invoice, r.findings, r.usd_total, decision=d, round=round_)
+
+
+@g.step
+async def critique(ctx: StepContext[State, Deps, Proposed]) -> Approve | Reject | Objected | HumanReview:
+    """The critic checks the proposal; agreement is final (after the guardrail), deadlock goes to a human."""
+    s, r, d = ctx.state, ctx.inputs, ctx.deps
+    assert s.doc is not None and r.decision is not None and s.key is not None
+    known = {f.rule_id for f in r.findings}
+    invented = [i for i in r.decision.cited_rule_ids if i not in known]
+    if invented:  # checked in code: a citation must name a finding that exists
+        verdict = reviewers.Critique(agrees=False, objections=[f"cited rule IDs not in the findings: {invented}"])
+    else:
+        verdict = await reviewers.critique(s.doc, d.settings, s.review_brief, r.decision, r.round)
+    d.tracer.log("critique", round=r.round, verdict=verdict.model_dump())
+    if verdict.agrees:
+        decision, overridden = approval.guard(r.decision, r.findings)
+        if overridden:
+            db.record(d.conn, s.key, EventType.GUARDRAIL_OVERRIDE, actor="guardrail", run_id=s.run_id,
+                      payload={"proposed": r.decision.model_dump(), "final": decision.model_dump()})  # fmt: skip
+        if decision.kind == "approve":
+            return Approve(r.invoice, r.findings, r.usd_total, decision=decision)
+        return Reject(r.invoice, r.findings, r.usd_total, decision=decision)
+    if r.round + 1 < approval.MAX_REVIEW_ROUNDS:
+        return Objected(r.invoice, r.findings, r.usd_total, objections=tuple(verdict.objections), round=r.round)
+    return HumanReview(r.invoice, r.findings, r.usd_total, reason="vp_critic_disagree")
 
 
 def _decided(ctx: StepContext[State, Deps, object], decision: Decision) -> InvoiceKey:
@@ -293,14 +330,16 @@ g.add(
     g.edge_from(validate).to(
         g.decision()
         .branch(g.match(AutoApprove).to(pay))
-        .branch(g.match(VpReview).to(vp_review))
+        .branch(g.match(VpReview).to(vp_propose))
         .branch(g.match(HumanReview).to(escalate))
         .branch(g.match(Reject).to(reject))
     ),
-    g.edge_from(vp_review).to(
+    g.edge_from(vp_propose).to(critique),
+    g.edge_from(critique).to(
         g.decision()
         .branch(g.match(Approve).to(pay))
         .branch(g.match(Reject).to(reject))
+        .branch(g.match(Objected).to(vp_propose))
         .branch(g.match(HumanReview).to(escalate))
     ),
     g.edge_from(pay, reject, escalate, load_failed).to(g.end_node),
