@@ -212,14 +212,14 @@ async def pay(ctx: StepContext[State, Deps, AutoApprove | Approve]) -> Outcome:
     )
     key = _decided(ctx, decision)
     assert r.invoice.total is not None
-    paid = payment.pay(ctx.deps.conn, key, r.invoice.total, r.invoice.currency, ctx.state.run_id)
+    res = payment.pay(ctx.deps.conn, key, r.invoice.total, r.invoice.currency, r.usd_total, ctx.state.run_id)
     return Outcome(
         key=key,
-        status=Status.PAID,
+        status=res.status,
         decision=decision,
         findings=r.findings,
         run_id=ctx.state.run_id,
-        amount_paid=paid,
+        amount_paid=res.amount if res.status == Status.PAID else None,
         invoice=r.invoice,
     )
 
@@ -232,7 +232,13 @@ async def reject(ctx: StepContext[State, Deps, Reject]) -> Outcome:
     key = _decided(ctx, decision)
     db.record(
         ctx.deps.conn, key, EventType.REJECTED, actor=decision.actor, run_id=ctx.state.run_id,
-        payload={"reasons": decision.reasons, "rule_ids": decision.cited_rule_ids}, status=Status.REJECTED,
+        payload={
+            "reasons": decision.reasons, "rule_ids": decision.cited_rule_ids,
+            # D4: name the offending lines so the vendor can reissue rather than being short-paid.
+            "bad_lines": sorted({str(f.evidence.get("item") or f.evidence.get("sku")) for f in r.findings
+                                 if f.severity == "hard" and (f.evidence.get("item") or f.evidence.get("sku"))}),
+        },
+        status=Status.REJECTED,
     )  # fmt: skip
     return Outcome(
         key=key,
