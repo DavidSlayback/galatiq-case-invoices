@@ -1,6 +1,6 @@
 # PRD: Acme Invoice Processing Agents
 
-Status: draft for brainstorming. Requirements only, no design yet.
+Status: grilled 2026-11-12. The answers to the §6 questions are in [DECISIONS.md](DECISIONS.md); that file wins wherever it and this PRD disagree.
 Source: [README.md](../README.md) at upstream `2f15015`, plus the 22 sample files in `data/invoices/`.
 
 Each requirement is tagged with where it comes from:

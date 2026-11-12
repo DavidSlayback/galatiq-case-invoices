@@ -1,0 +1,47 @@
+# Decision log
+
+Decisions from the grilling session on 2026-11-12. Each one comes from David unless it is marked otherwise. Requirement IDs refer to [PRD.md](PRD.md); B-ids are the brainstorm questions in PRD §6.
+
+## Domain rules
+
+| # | Decision | Why / consequence |
+|---|---|---|
+| D1 (B-1) | Check stock literally: quantity ≤ stock. The README adds one sentence: "read as a goods-received check; production would do a PO / receipt three-way match." | Matches the brief's expected outcomes. The invoices are bills to Acme ("Bill To: Acme", "Attn: Accounts Payable"), so Acme is the buyer. |
+| D2 (B-2) | Keep a ledger keyed by vendor + invoice number. A copy with the same content is skipped as a duplicate. A higher revision replaces the original if it is unpaid; if the original was paid, pay only the difference or escalate. | Never pay twice (1011–1013 come in two formats; 1004 has a revision R1). |
+| D3 (B-3) | Do not consume stock. Every invoice is checked against the seeded stock. | Outcomes don't depend on batch order. The README notes that production would reserve stock. |
+| D4 (B-4) | No partial approval. Reject the whole invoice; the rejection notice lists the bad lines. | Accounts payable doesn't short-pay without a credit note (1016). |
+| D5 (B-5) | Convert currency with a fixed, dated mock rate table, then apply the normal rules. Foreign currency is a note, not a flag. | 1014 is in EUR. Works offline. |
+| D6 (B-6) | Add a `unit_price` column. A price more than 5% above catalog is a soft flag; discounts are noted only. | 1010's rush line escalates; 1013's discounts pass. |
+| D7 (B-7) | Hard failures (unknown item, stock overrun, arithmetic or integrity errors) reject before approval. Under $10K with no flags: auto-approve. $10K–$50K, or any soft flag: VP agent review. Over $50K, or any fraud signal: human. A total of $9.5K–$10K is a soft flag. | Keeps the LLM on the cases that need judgement. |
+| D8 | The processing date comes from `--as-of`, default 2026-02-01. | The data is dated Jan–Feb 2026; against the real date, every invoice would be past due. |
+| D9 | Seed the vendor registry with the plausible vendors. Unknown vendors: Fraudster LLC, NoProd Industries, Global Supply Chain Partners, and the blank vendor. QuickShip matches FastShip Ltd. only through an alias, which raises a "vendor renamed" soft flag. | Makes the unknown-vendor and renamed-vendor paths real. |
+| D10 | Fraud signals (unknown vendor plus urgency or wire language, a lookalike name, changed bank details, prompt injection) always escalate to a human with a "suspected fraud" label. They never auto-reject. Hard failures still reject first. | Avoids false-positive rejections of real vendors. |
+
+## Architecture
+
+| # | Decision | Why / consequence |
+|---|---|---|
+| D11 (B-8) | Agents use PydanticAI; the workflow graph uses pydantic-graph. | Typed structured outputs and tools, a Mermaid diagram for free, and persistence for the audit trail. One dependency family. |
+| D12 (B-12) | The model is set in config. Use Claude through the Anthropic key until David supplies an xAI key, then switch to Grok. A scripted PydanticAI `FunctionModel` runs tests and the `--offline` demo. | The brief prefers Grok, and there is no key yet. Tests need no network. |
+| D13 (B-10) | Format loaders (json, csv, xml, pdf text) run first. The LLM extraction agent always produces the typed `Invoice`, and deterministic checks reconcile the totals. | Agentic, yet anchored by the parsers. |
+| D14 (B-11) | Extraction self-correction: feed the specific mismatch back, at most 2 retries, then keep the result with an "arithmetic mismatch" finding, which validation rejects. | The LLM must not invent consistency (1009's mismatch is real). |
+| D15 (B-9, B-11) | In the VP tier, a VP agent proposes approve or reject, citing rule IDs. A separate critic agent checks it. If they still disagree after 2 rounds, a human decides. A code guardrail makes approval impossible when any hard rule failed. | The LLM has real but bounded authority (FR-3.6). |
+| D16 (B-13) | PDFs: use the text layer if present. Otherwise run Tesseract OCR, and if OCR is empty or low-confidence, fall back to a vision model. | David answered "3 then 1": local first, model last. |
+| D17 | Business data (inventory with prices, vendors, ledger, findings, decisions, payments, inbox) lives in SQLite. Per-run agent traces (prompts, tool calls, tokens, latency) go to JSONL under `runs/`. | Large trace data stays out of the database. |
+
+## Product
+
+| # | Decision | Why / consequence |
+|---|---|---|
+| D18 (B-14) | A Rich CLI (a panel per invoice and a batch summary) plus a Streamlit dashboard (submit an invoice, follow the stages, inbox, trace view, ROI). | Pure Python. Addresses the UI/UX criterion. |
+| D19 | Escalation inbox in both the CLI (`main.py review --list` / `review INV-x --approve --note ...`) and Streamlit. A human decision requires a note and resumes the graph. | Closes the human-in-the-loop path. |
+| D20 (B-15) | Extras in scope: an eval harness (`expected_outcomes.yaml` plus `main.py eval`); adversarial invoices (prompt injection, split invoices just under the threshold, a lookalike vendor, an image-only scan, a bank-detail change); a vendor registry with a risk score; a cost, latency and ROI panel. | All four were selected. |
+| D21 (B-16) | The ROI panel takes editable assumptions (invoices per year, 30% error rate, 5-day delay, $2M) and labels any assumed volume. Savings come from measured cost, latency and catch rate. | The brief gives no invoice volume, so we don't invent one. |
+| D22 (B-17) | Build order: (1) core graph, CLI and seeded database; (2) eval on the 17 original invoices; (3) ledger and inbox; (4) Streamlit; (5) vendor risk, adversarial files, OCR chain, ROI. If time runs short, cut from the end. | Correctness is proven early. |
+| D23 | Tooling: uv, ruff, pyright and pytest, with pre-commit as the local gate. Use the highest Python version every dependency supports: try 3.14 first and step down only if a wheel is missing. | David asked for the newest Python. |
+| D24 | Presentation: a README (quickstart, generated Mermaid graph, this decision log, eval scorecard, ROI, limitations), a demo video, and a Claude Artifact in place of a slide deck. | The graders score presentation and business impact. |
+
+## Agent choices (not decided by David; flag if wrong)
+
+- The VP critique loop and the extraction loop each allow at most 2 retries, as offered in the options David picked.
+- The expected outcomes in PRD §5 become `expected_outcomes.yaml`, adjusted for D2 (1004 R1 supersedes 1004) and D10 (fraud cases escalate unless a hard rule rejects them first).

@@ -88,6 +88,31 @@ footer{font-size:.85rem;color:var(--muted);border-top:1px solid var(--rule);padd
 </header>
 
 <section>
+  <h2>Decisions · grilled 2026-11-12</h2>
+  <div class="tbl" style="border:1px solid var(--rule);background:var(--surface);border-radius:4px"><table>
+  <tr><th>Area</th><th>Decision</th></tr>
+  <tr><td class="id">Stock</td><td>Check quantity ≤ stock exactly as the brief says, with a one-line README caveat about PO matching. Approvals don't consume stock.</td></tr>
+  <tr><td class="id">Duplicates</td><td>A ledger keyed by vendor + invoice number. Same-content copies are skipped; a higher revision replaces an unpaid original.</td></tr>
+  <tr><td class="id">Bad lines</td><td>Reject the whole invoice and list the bad lines. No partial payment.</td></tr>
+  <tr><td class="id">Currency</td><td>Fixed, dated mock exchange rate, then the normal rules.</td></tr>
+  <tr><td class="id">Price</td><td>More than 5% above catalog is a soft flag; discounts are noted only.</td></tr>
+  <tr><td class="id">Tiers</td><td>Hard failures reject. Under $10K with no flags is auto-approved. $10K–$50K or a soft flag goes to the VP agent. Over $50K or a fraud signal goes to a human. Fraud signals never auto-reject.</td></tr>
+  <tr><td class="id">Dates</td><td>Date checks use <code>--as-of</code>, default 2026-02-01.</td></tr>
+  <tr><td class="id">Vendors</td><td>The registry is seeded with the plausible vendors; four stay unknown. FastShip → QuickShip is an alias, flagged as a rename.</td></tr>
+  <tr><td class="id">Stack</td><td>PydanticAI agents on pydantic-graph; uv on the newest Python the dependencies support.</td></tr>
+  <tr><td class="id">Model</td><td>Claude until the Grok key arrives; a scripted model for tests and offline runs.</td></tr>
+  <tr><td class="id">Ingestion</td><td>Parsers first, LLM-typed output, at most 2 retries when totals don't reconcile, then a finding.</td></tr>
+  <tr><td class="id">VP loop</td><td>The VP agent proposes, a critic checks it, and 2 rounds of disagreement send it to a human. Code blocks approval when any hard rule failed.</td></tr>
+  <tr><td class="id">PDF</td><td>Text layer, then Tesseract, then a vision model.</td></tr>
+  <tr><td class="id">Storage</td><td>SQLite for business data; JSONL agent traces under <code>runs/</code>.</td></tr>
+  <tr><td class="id">UI</td><td>Rich CLI and Streamlit. The escalation inbox is in both, and a human decision requires a note.</td></tr>
+  <tr><td class="id">Extras</td><td>Eval harness, adversarial invoices, vendor risk score, cost and ROI panel with editable assumptions.</td></tr>
+  <tr><td class="id">Order</td><td>Core → eval → inbox → UI → extras; cut from the end.</td></tr>
+  <tr><td class="id">Present</td><td>README with a generated diagram and decision log, a demo video, and an Artifact in place of slides.</td></tr>
+  </table></div>
+</section>
+
+<section>
   <div class="stats">
     <div class="stat"><span class="n">$2M</span><span class="l">lost each year to manual processing</span></div>
     <div class="stat"><span class="n">30%</span><span class="l">error rate today</span></div>
