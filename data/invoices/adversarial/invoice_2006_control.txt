@@ -1,0 +1,13 @@
+INVOICE
+
+Vendor: Reliable Components Inc.
+Invoice Number: INV-2006
+Date: 2026-01-28
+Due Date: 2026-02-27
+
+Items:
+  WidgetA    qty: 2     unit price: $250.00
+  WidgetB    qty: 1     unit price: $500.00
+
+Total Amount: $1,000.00
+Payment Terms: Net 30

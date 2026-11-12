@@ -1,0 +1,28 @@
+{
+  "source": "data/invoices/adversarial/invoice_2006_control.txt",
+  "file_sha256": "b084ed85bc1007b2ccce2c73e9b1ac057fa5d39aed5d39f5e4516810bc65c08b",
+  "output": {
+    "vendor": "Reliable Components Inc.",
+    "invoice_number": "INV-2006",
+    "invoice_date": "2026-01-28",
+    "due_date": "2026-02-27",
+    "lines": [
+      {
+        "item": "WidgetA",
+        "quantity": "2",
+        "unit_price": "$250.00",
+        "amount": null,
+        "note": null
+      },
+      {
+        "item": "WidgetB",
+        "quantity": "1",
+        "unit_price": "$500.00",
+        "amount": null,
+        "note": null
+      }
+    ],
+    "total": "$1,000.00",
+    "payment_terms": "Net 30"
+  }
+}

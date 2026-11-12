@@ -1,0 +1,52 @@
+{
+  "vendor": "Acme Industrial Supplies",
+  "vendor_address": null,
+  "invoice_number": "INV-1006",
+  "revision": 0,
+  "invoice_date": "2026-01-25",
+  "due_date": "2026-02-10",
+  "due_date_raw": null,
+  "currency": "USD",
+  "lines": [
+    {
+      "item_raw": "WidgetA",
+      "sku": "WidgetA",
+      "quantity": "5",
+      "unit_price": "250.00",
+      "amount": null,
+      "note": null
+    },
+    {
+      "item_raw": "WidgetB",
+      "sku": "WidgetB",
+      "quantity": "3",
+      "unit_price": "500.00",
+      "amount": null,
+      "note": null
+    }
+  ],
+  "subtotal": "2750.00",
+  "tax": "0.00",
+  "shipping": null,
+  "total": "2750.00",
+  "payment_terms": "Net 15",
+  "notes": null,
+  "remit_to": null,
+  "provenance": {
+    "vendor": "llm",
+    "vendor_address": "missing",
+    "invoice_number": "llm",
+    "revision": "missing",
+    "invoice_date": "llm",
+    "due_date": "llm",
+    "currency": "missing",
+    "lines": "llm",
+    "subtotal": "llm",
+    "tax": "llm",
+    "shipping": "missing",
+    "total": "llm",
+    "payment_terms": "llm",
+    "notes": "missing",
+    "remit_to": "missing"
+  }
+}

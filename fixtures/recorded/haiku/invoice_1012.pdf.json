@@ -1,0 +1,60 @@
+{
+  "vendor": "QuickShip Distributers",
+  "vendor_address": null,
+  "invoice_number": "INV-1012",
+  "revision": 0,
+  "invoice_date": "2026-01-26",
+  "due_date": "2026-02-25",
+  "due_date_raw": null,
+  "currency": "USD",
+  "lines": [
+    {
+      "item_raw": "Widget A",
+      "sku": "WidgetA",
+      "quantity": "12",
+      "unit_price": "250",
+      "amount": "3000.00",
+      "note": null
+    },
+    {
+      "item_raw": "WidgetB",
+      "sku": "WidgetB",
+      "quantity": "7",
+      "unit_price": "500",
+      "amount": "3500.00",
+      "note": null
+    },
+    {
+      "item_raw": "Gadget X",
+      "sku": "GadgetX",
+      "quantity": "4",
+      "unit_price": "750",
+      "amount": "3000.00",
+      "note": null
+    }
+  ],
+  "subtotal": "9500.00",
+  "tax": "475.00",
+  "shipping": null,
+  "total": "9975.00",
+  "payment_terms": "Net 30",
+  "notes": "Ref PO-20260115. Deliver to warehouse dock B. Contact Jim at ext 4421 with questions. Vendor shown as \"QuickShip Distributers (formerly FastShip Ltd.)\". Tax line labeled \"TAX (5%)\". Attn line reads \"Accounts Payble\" as written.",
+  "remit_to": null,
+  "provenance": {
+    "vendor": "llm",
+    "vendor_address": "missing",
+    "invoice_number": "llm",
+    "revision": "missing",
+    "invoice_date": "llm",
+    "due_date": "llm",
+    "currency": "missing",
+    "lines": "llm",
+    "subtotal": "llm",
+    "tax": "llm",
+    "shipping": "missing",
+    "total": "llm",
+    "payment_terms": "llm",
+    "notes": "llm",
+    "remit_to": "missing"
+  }
+}

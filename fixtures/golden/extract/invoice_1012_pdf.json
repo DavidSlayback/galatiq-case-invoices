@@ -1,0 +1,38 @@
+{
+  "source": "data/invoices/invoice_1012.pdf",
+  "file_sha256": "c20e713fe9e64c90b75b8ac4f38b12c719768c38e86428481e8bec6183035d43",
+  "output": {
+    "vendor": "QuickShip Distributers",
+    "invoice_number": "INV 1012",
+    "invoice_date": "26-Jan-2O26",
+    "due_date": "25-Feb-2026",
+    "lines": [
+      {
+        "item": "Widget A",
+        "quantity": "12",
+        "unit_price": "$250",
+        "amount": "$3,000.00",
+        "note": null
+      },
+      {
+        "item": "WidgetB",
+        "quantity": "7",
+        "unit_price": "$500",
+        "amount": "$3,500.O0",
+        "note": null
+      },
+      {
+        "item": "Gadget X",
+        "quantity": "4",
+        "unit_price": "$750",
+        "amount": "$3,000.00",
+        "note": null
+      }
+    ],
+    "subtotal": "$9,500.00",
+    "tax": "$475.00",
+    "total": "$9,975.00",
+    "payment_terms": "Net 30",
+    "notes": "Ref PO-20260115. Deliver to warehouse dock B. Contact Jim at ext 4421 with questions."
+  }
+}

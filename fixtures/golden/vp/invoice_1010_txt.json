@@ -1,0 +1,15 @@
+{
+  "source": "data/invoices/invoice_1010.txt",
+  "file_sha256": "99d9958bf530d30d0766c26a9b1f2ea4810b0da9399ab8da24ec47e764872871",
+  "attempts": [
+    {
+      "decision": "approve",
+      "reasons": [
+        "The $50/unit premium is on a line the vendor labels 'rush order'; the surcharge is itemised and the rest of the invoice is at catalog."
+      ],
+      "cited_rule_ids": [
+        "PRICE_OVER_CATALOG"
+      ]
+    }
+  ]
+}

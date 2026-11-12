@@ -34,7 +34,7 @@ Decisions from the grilling session on 2026-11-12. Each one comes from David unl
 | # | Decision | Why / consequence |
 |---|---|---|
 | D18 (B-14) | A Rich CLI (a panel per invoice and a batch summary) plus a Streamlit dashboard (submit an invoice, follow the stages, inbox, trace view, ROI). | Pure Python. Addresses the UI/UX criterion. |
-| D19 | Escalation inbox in both the CLI (`main.py review --list` / `review INV-x --approve --note ...`) and Streamlit. A human decision requires a note and resumes the graph. | Closes the human-in-the-loop path. |
+| D19 | Escalation inbox in both the CLI (`main.py review` / `review INV-x --approve --note ...`) and Streamlit. A human decision requires a note and resumes the graph. | Closes the human-in-the-loop path. |
 | D20 (B-15) | Extras in scope: an eval harness (`expected_outcomes.yaml` plus `main.py eval`); adversarial invoices (prompt injection, split invoices just under the threshold, a lookalike vendor, an image-only scan, a bank-detail change); a vendor registry with a risk score; a cost, latency and ROI panel. | All four were selected. |
 | D21 (B-16) | The ROI panel takes editable assumptions (invoices per year, 30% error rate, 5-day delay, $2M) and labels any assumed volume. Savings come from measured cost, latency and catch rate. | The brief gives no invoice volume, so we don't invent one. |
 | D22 (B-17) | Build order: (1) core graph, CLI and seeded database; (2) eval on the 17 original invoices; (3) ledger and inbox; (4) Streamlit; (5) vendor risk, adversarial files, OCR chain, ROI. If time runs short, cut from the end. | Correctness is proven early. |
@@ -56,7 +56,7 @@ Decisions from the grilling session on 2026-11-12. Each one comes from David unl
 | D27 | Boundaries: NEAR_THRESHOLD is 9,500 ≤ total < 10,000. VP is 10,000 ≤ total ≤ 50,000; human is > 50,000. PAST_DUE is due < as_of. DUE_BEFORE_INVOICE is due ≤ invoice date. UNKNOWN_VENDOR alone is soft; with urgency or wire language it becomes the fraud rule UNKNOWN_VENDOR_PRESSURE (D10 as written). | Removes ambiguity at the edges. |
 | D28 | Fixed VP-tier outcomes for the eval: 1001 approve, 1010 approve, 1012 VP approve then critic objects twice → inbox. | Stops the eval from being circular; gives the inbox a natural sample. |
 | D29 | Payments go out in the invoice currency (1014: EUR 4,125.00) with the USD equivalent recorded (4,455.00); tiers and price rules use USD. | The mock_payment signature has no currency field. |
-| D30 | INV-1007 also has a stated-total error (14,750 + 885 = 15,635, not 15,525); its expected outcome requires ARITHMETIC_MISMATCH. | The PRD missed it; a fresh-context review found it. |
+| D30 | Two invoices state a wrong total, and both expected outcomes require ARITHMETIC_MISMATCH. INV-1007: 14,750 + 885 = 15,635, not 15,525. INV-1013: 21,040.00 + 1,472.80 = 22,512.80, not 22,562.80 ($50 over). | The PRD missed both. A fresh-context review found 1007; the reconcile step found 1013 on its first run. |
 
 ## Model backends (David, 2026-11-12)
 
@@ -64,6 +64,23 @@ Decisions from the grilling session on 2026-11-12. Each one comes from David unl
 |---|---|---|
 | D31 | No API credits are bought. Live calls go through David's subscriptions: Grok 4.7 via `cursor-agent -p` (Cursor Pro) is the default, and Claude Haiku via `claude -p` (Claude Max) is the cross-check. Both are wrapped as a PydanticAI `FunctionModel` bridge, sandboxed in an empty temp dir with tools off or read-only. Unattended live runs are allowed (about 100–200 calls). | Uses the plans David already pays for and honours "use Grok". Invoices are untrusted, so the agent CLIs must not have tools that act. |
 | D32 | When no model is configured, pick one automatically: `XAI_API_KEY` → xAI API; another API key → that API; a logged-in `cursor-agent` or `claude` → the CLI bridge; otherwise `--offline` replay with a banner. | Graders without David's logins can always run it. |
+
+## After the live pass (2026-11-12, agent choices; flag if wrong)
+
+| # | Decision | Why / consequence |
+|---|---|---|
+| D33 | Vendor-master changes (`VENDOR_RENAMED`) go straight to a human, labelled "vendor change". This replaces D28's scripted VP/critic deadlock for 1012. | On the live pass both Grok and Haiku approved 1012, because the registry links QuickShip to FastShip. The decision belongs to a person confirming the change, not to model judgement. AP practice is to verify vendor-master changes out of band. |
+| D34 | The extractor's reconcile step also re-checks due dates more than 45 days off the stated terms (a likely wrong year). This never becomes a finding by itself. | Haiku misread 2026 as 2027 on the control invoice. |
+| D35 | A "(formerly X)" note is moved out of the vendor name into notes. | Haiku kept it in the name, which changed the ledger key and broke duplicate detection on 1012. |
+
+## Final review fixes (2026-11-12, agent choices; flag if wrong)
+
+| # | Decision | Why / consequence |
+|---|---|---|
+| D36 | Ledger keys are NFKC- and whitespace-normalised, and vendor and number compare case-insensitively in every table. | Otherwise "WIDGETS INC." could be paid again (review B1). |
+| D37 | A unit price is derived from the line amount when only an amount is stated; a line with no price at all raises PRICE_UNVERIFIABLE (soft). A total ≤ 0 or a negative unit price is hard. A payment ≤ 0 is recorded as a credit due, never sent to the bank. | Review B2 and B6. |
+| D38 | A vendor name that matches the registry only after Unicode folding is a look-alike. One normaliser is used for every vendor comparison. | A full-width "Widgets" passed as exact and skipped the bank check (B4). |
+| D39 | The injection rule scans the raw document text and every extracted string. Inbox actions resolve by inbox id or vendor and refuse ambiguity. A conflicting copy counts what the original was paid. CLI prompts go on stdin. | Review B3, B5, B7, B8. |
 
 ## Agent choices (not decided by David; flag if wrong)
 

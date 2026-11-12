@@ -1,0 +1,27 @@
+{
+  "source": "data/invoices/invoice_1011.pdf",
+  "file_sha256": "bf3d624f6dceec42f52ac7129c14fcb975f976dc3ccaba1f07abd4f18c511da6",
+  "output": {
+    "vendor": "Summit Manufacturing Co.",
+    "invoice_number": "INV-1011",
+    "invoice_date": "2026-01-20",
+    "due_date": "2026-02-20",
+    "lines": [
+      {
+        "item": "WidgetA",
+        "quantity": "6",
+        "unit_price": "$250.00",
+        "amount": "$1,500.00",
+        "note": null
+      },
+      {
+        "item": "WidgetB",
+        "quantity": "3",
+        "unit_price": "$500.00",
+        "amount": "$1,500.00",
+        "note": null
+      }
+    ],
+    "total": "$3,000.00"
+  }
+}

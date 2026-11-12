@@ -1,0 +1,60 @@
+{
+  "vendor": "MegaWidgets Corp",
+  "vendor_address": null,
+  "invoice_number": "INV-1007",
+  "revision": 0,
+  "invoice_date": "2026-01-28",
+  "due_date": "2026-02-28",
+  "due_date_raw": null,
+  "currency": "USD",
+  "lines": [
+    {
+      "item_raw": "WidgetA",
+      "sku": "WidgetA",
+      "quantity": "20",
+      "unit_price": "250.00",
+      "amount": "5000.00",
+      "note": null
+    },
+    {
+      "item_raw": "WidgetB",
+      "sku": "WidgetB",
+      "quantity": "15",
+      "unit_price": "500.00",
+      "amount": "7500.00",
+      "note": null
+    },
+    {
+      "item_raw": "GadgetX",
+      "sku": "GadgetX",
+      "quantity": "3",
+      "unit_price": "750.00",
+      "amount": "2250.00",
+      "note": null
+    }
+  ],
+  "subtotal": "14750.00",
+  "tax": "885.00",
+  "shipping": null,
+  "total": "15525.00",
+  "payment_terms": null,
+  "notes": "Tax label as written: \"Tax (6%):\". Does not reconcile: Subtotal 14750.00 + Tax 885.00 = 15635.00, but the stated Total is 15525.00. Total copied as written and not corrected; no shipping line shown. Source is a CSV-style document; the subtotal, tax and total appear as labelled rows in the Line Total column.",
+  "remit_to": null,
+  "provenance": {
+    "vendor": "llm",
+    "vendor_address": "missing",
+    "invoice_number": "llm",
+    "revision": "missing",
+    "invoice_date": "llm",
+    "due_date": "llm",
+    "currency": "missing",
+    "lines": "llm",
+    "subtotal": "llm",
+    "tax": "llm",
+    "shipping": "missing",
+    "total": "llm",
+    "payment_terms": "missing",
+    "notes": "llm",
+    "remit_to": "missing"
+  }
+}

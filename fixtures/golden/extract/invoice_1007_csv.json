@@ -1,0 +1,36 @@
+{
+  "source": "data/invoices/invoice_1007.csv",
+  "file_sha256": "332b4c6464b59d5a286549ae8c0cc69f0eaec8f15665324a32c2a91839e8f2fe",
+  "output": {
+    "vendor": "MegaWidgets Corp",
+    "invoice_number": "INV-1007",
+    "invoice_date": "01/28/2026",
+    "due_date": "02/28/2026",
+    "lines": [
+      {
+        "item": "WidgetA",
+        "quantity": "20",
+        "unit_price": "250.00",
+        "amount": "5000.00",
+        "note": null
+      },
+      {
+        "item": "WidgetB",
+        "quantity": "15",
+        "unit_price": "500.00",
+        "amount": "7500.00",
+        "note": null
+      },
+      {
+        "item": "GadgetX",
+        "quantity": "3",
+        "unit_price": "750.00",
+        "amount": "2250.00",
+        "note": null
+      }
+    ],
+    "subtotal": "14750.00",
+    "tax": "885.00",
+    "total": "15525.00"
+  }
+}

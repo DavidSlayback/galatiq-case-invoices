@@ -125,7 +125,7 @@ These are draft expected outcomes for the test oracle, still to be confirmed whe
 | 1010 | TXT table | WidgetA appears twice (12 in total, fine); rush price premium; shipping line | Approve or escalate (price variance) |
 | 1011 | PDF and TXT | Clean; two copies | Approve once; second copy flagged as a duplicate |
 | 1012 | PDF and TXT | OCR noise; vendor renamed; $9,975 | Escalate (vendor change, near threshold) |
-| 1013 | PDF and JSON | Each line fits stock, the summed totals do not; $22.6K | Reject; second copy is a duplicate |
+| 1013 | PDF and JSON | Each line fits stock, the summed totals do not; $22.6K; stated total $50 too high (21,040 + 1,472.80 = 22,512.80) | Reject; second copy is a duplicate |
 | 1014 | XML | EUR; prices below catalog | Escalate (currency) |
 | 1015 | CSV rows | Clean | Approve |
 | 1016 | JSON | WidgetC unknown; known vendor | Reject, or partial approval |

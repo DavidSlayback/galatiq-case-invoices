@@ -1,0 +1,32 @@
+{
+  "source": "data/invoices/invoice_1009.json",
+  "file_sha256": "305a453ed46b0b54f681b58b4ac218cd93057dd4ee14e2110be61c1ce1a072a2",
+  "output": {
+    "vendor": "",
+    "vendor_address": null,
+    "invoice_number": "INV-1009",
+    "invoice_date": "2026-01-15",
+    "due_date": null,
+    "currency": "USD",
+    "lines": [
+      {
+        "item": "WidgetA",
+        "quantity": "-5",
+        "unit_price": "250.00",
+        "amount": null,
+        "note": null
+      },
+      {
+        "item": "WidgetB",
+        "quantity": "2",
+        "unit_price": "500.00",
+        "amount": null,
+        "note": null
+      }
+    ],
+    "subtotal": "1000.00",
+    "tax": "0.00",
+    "total": "-250.00",
+    "payment_terms": ""
+  }
+}

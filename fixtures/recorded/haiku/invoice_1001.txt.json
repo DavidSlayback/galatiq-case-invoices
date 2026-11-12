@@ -1,0 +1,52 @@
+{
+  "vendor": "Widgets Inc.",
+  "vendor_address": null,
+  "invoice_number": "INV-1001",
+  "revision": 0,
+  "invoice_date": "2026-01-15",
+  "due_date": "2026-02-01",
+  "due_date_raw": null,
+  "currency": "USD",
+  "lines": [
+    {
+      "item_raw": "WidgetA",
+      "sku": "WidgetA",
+      "quantity": "10",
+      "unit_price": "250.00",
+      "amount": null,
+      "note": null
+    },
+    {
+      "item_raw": "WidgetB",
+      "sku": "WidgetB",
+      "quantity": "5",
+      "unit_price": "500.00",
+      "amount": null,
+      "note": null
+    }
+  ],
+  "subtotal": "5000.00",
+  "tax": "0.00",
+  "shipping": null,
+  "total": "5000.00",
+  "payment_terms": "Net 15",
+  "notes": "Tax line labelled \"Tax (0%)\". No line-level amounts are shown on the document.",
+  "remit_to": null,
+  "provenance": {
+    "vendor": "llm",
+    "vendor_address": "missing",
+    "invoice_number": "llm",
+    "revision": "missing",
+    "invoice_date": "llm",
+    "due_date": "llm",
+    "currency": "missing",
+    "lines": "llm",
+    "subtotal": "llm",
+    "tax": "llm",
+    "shipping": "missing",
+    "total": "llm",
+    "payment_terms": "llm",
+    "notes": "llm",
+    "remit_to": "missing"
+  }
+}

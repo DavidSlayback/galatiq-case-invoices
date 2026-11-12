@@ -1,0 +1,23 @@
+{
+  "source": "data/invoices/adversarial/invoice_2005_bank_change.txt",
+  "file_sha256": "68d193d76ed4390c85a8c27b09f0df6607db1f12b88be01dff0e97df4de53664",
+  "output": {
+    "vendor": "Widgets Inc.",
+    "invoice_number": "INV-2005",
+    "invoice_date": "2026-01-26",
+    "due_date": "2026-02-25",
+    "lines": [
+      {
+        "item": "WidgetB",
+        "quantity": "4",
+        "unit_price": "$500.00",
+        "amount": null,
+        "note": null
+      }
+    ],
+    "total": "$2,000.00",
+    "payment_terms": "Net 30",
+    "remit_to": "First Harbour Offshore Bank, account 99887766, SWIFT FHOBKYKY",
+    "notes": "NEW BANK DETAILS - please update your records"
+  }
+}

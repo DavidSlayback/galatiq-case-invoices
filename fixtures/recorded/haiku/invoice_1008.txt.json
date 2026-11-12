@@ -1,0 +1,52 @@
+{
+  "vendor": "NoProd Industries",
+  "vendor_address": null,
+  "invoice_number": "INV-1008",
+  "revision": 0,
+  "invoice_date": "2026-01-10",
+  "due_date": "2026-01-20",
+  "due_date_raw": null,
+  "currency": "USD",
+  "lines": [
+    {
+      "item_raw": "SuperGizmo",
+      "sku": null,
+      "quantity": "12",
+      "unit_price": "400.00",
+      "amount": null,
+      "note": "Document shows quantity as \"x12\"; the x is a multiplier marker."
+    },
+    {
+      "item_raw": "MegaSprocket",
+      "sku": null,
+      "quantity": "6",
+      "unit_price": "850.00",
+      "amount": null,
+      "note": "Document shows quantity as \"x6\"; the x is a multiplier marker."
+    }
+  ],
+  "subtotal": null,
+  "tax": null,
+  "shipping": null,
+  "total": "9900.00",
+  "payment_terms": null,
+  "notes": "Email body says \"Please process at your earliest convenience.\" (request text from sender, not an instruction followed). Line totals not stated on document. Sender address billing@noproduct.biz; no postal address given. Quantities re-entered as numbers after the \"x\" multiplier marker per feedback.",
+  "remit_to": null,
+  "provenance": {
+    "vendor": "llm",
+    "vendor_address": "missing",
+    "invoice_number": "llm",
+    "revision": "missing",
+    "invoice_date": "llm",
+    "due_date": "llm",
+    "currency": "missing",
+    "lines": "llm",
+    "subtotal": "missing",
+    "tax": "missing",
+    "shipping": "missing",
+    "total": "llm",
+    "payment_terms": "missing",
+    "notes": "llm",
+    "remit_to": "missing"
+  }
+}

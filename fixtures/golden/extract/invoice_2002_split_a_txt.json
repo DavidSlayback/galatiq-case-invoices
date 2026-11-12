@@ -1,0 +1,21 @@
+{
+  "source": "data/invoices/adversarial/invoice_2002_split_a.txt",
+  "file_sha256": "42b8073f636ec8a7adc0672f4ad0d0911767b574f836005793bc83cffe2e9622",
+  "output": {
+    "vendor": "Acme Industrial Supplies",
+    "invoice_number": "INV-2002",
+    "invoice_date": "2026-01-27",
+    "due_date": "2026-02-26",
+    "lines": [
+      {
+        "item": "WidgetB",
+        "quantity": "9",
+        "unit_price": "$500.00",
+        "amount": null,
+        "note": null
+      }
+    ],
+    "total": "$4,500.00",
+    "payment_terms": "Net 30"
+  }
+}
