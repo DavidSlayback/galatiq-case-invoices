@@ -1,15 +1,15 @@
 # Queue
 
-**Frontier:** 04, 06, 07, 08. Next run: `/stacked-afk-loop` over `docs/afk/tickets/`. All 19 tickets are AFK.
+**Frontier:** 08, 07, then 05. Next run: `/stacked-afk-loop` over `docs/afk/tickets/`. All 19 tickets are AFK.
 
 | # | Ticket | Wave | Lane | Status |
 |---|---|---|---|---|
 | 01 | [scaffold](tickets/01-scaffold.md) | 0 | serial | done (#1) |
 | 02 | [domain-and-db](tickets/02-domain-and-db.md) | 1 | serial | done (#2) |
 | 03 | [tracer-bullet](tickets/03-tracer-bullet.md) | 2 | serial | done (#4) |
-| 04 | [loaders](tickets/04-loaders.md) | 3 | loaders | verifying |
+| 04 | [loaders](tickets/04-loaders.md) | 3 | loaders | done (#5) |
 | 05 | [extraction-agent](tickets/05-extraction-agent.md) | 4 | serial | todo |
-| 06 | [rules](tickets/06-rules.md) | 3 | rules | todo |
+| 06 | [rules](tickets/06-rules.md) | 3 | rules | done |
 | 07 | [approval](tickets/07-approval.md) | 3 | approval | todo |
 | 08 | [payment](tickets/08-payment.md) | 3 | payment | todo |
 | 09 | [eval](tickets/09-eval.md) | 5 | serial | todo |
