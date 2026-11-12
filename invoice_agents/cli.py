@@ -105,9 +105,9 @@ def process(
 def eval_cmd(
     offline: OfflineOpt = False,
     model: ModelOpt = None,
-    scorecard: Annotated[Path | None, typer.Option(help="Write the Markdown scorecard here.")] = Path(
-        "docs/scorecard.md"
-    ),
+    scorecard: Annotated[
+        Path | None, typer.Option(help="Write the Markdown scorecard here (offline default: docs/scorecard.md).")
+    ] = None,
     record: Annotated[
         Path | None, typer.Option(help="With a live model, save each extraction here to compare with the goldens.")
     ] = None,
@@ -120,6 +120,8 @@ def eval_cmd(
         console.print(f"[red]Stopped: {e}[/red] Wait for the quota to reset or pick another --model.")
         raise typer.Exit(3) from e
     console.print(eval_mod.table(rows))
+    if scorecard is None and s.offline:  # a live eval must not overwrite the offline scorecard
+        scorecard = Path("docs/scorecard.md")
     if scorecard:
         scorecard.write_text(eval_mod.markdown(rows, s.model or "offline"), encoding="utf-8")
     bad = eval_mod.failures(rows)
@@ -169,6 +171,7 @@ def review(
     approve: Annotated[bool, typer.Option("--approve", help="Approve and pay.")] = False,
     reject: Annotated[bool, typer.Option("--reject", help="Reject.")] = False,
     note: Annotated[str, typer.Option("--note", help="Required reason for the decision.")] = "",
+    vendor: Annotated[str | None, typer.Option("--vendor", help="Needed when two vendors share the number.")] = None,
     db: DbOpt = None,
 ) -> None:
     """List escalated invoices, or approve/reject one with a note."""
@@ -181,7 +184,9 @@ def review(
         raise typer.Exit(2)
     try:
         with contextlib.redirect_stdout(io.StringIO()):
-            result = inbox.resolve(conn, invoice_number, approve=approve, note=note, reviewer="human:cli")
+            result = inbox.resolve(
+                conn, invoice_number, approve=approve, note=note, reviewer="human:cli", vendor=vendor
+            )
     except inbox.InboxError as e:
         console.print(f"[red]{e}[/red]")
         raise typer.Exit(1) from e

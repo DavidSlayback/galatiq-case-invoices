@@ -44,7 +44,9 @@ for it in items:
             if approve or reject:
                 try:
                     with contextlib.redirect_stdout(io.StringIO()):
-                        res = inbox.resolve(c, it.key.invoice_number, approve=approve, note=note, reviewer="human:ui")
+                        res = inbox.resolve(
+                            c, it.key.invoice_number, approve=approve, note=note, reviewer="human:ui", inbox_id=it.id
+                        )
                     st.session_state.inbox_msg = f"{it.key.invoice_number}: {res['status']} {res.get('amount', '')}"
                     st.rerun()
                 except inbox.InboxError as e:

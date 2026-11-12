@@ -22,7 +22,7 @@ def reg(conn: sqlite3.Connection) -> tuple[dict[str, str], dict[str, str]]:
         ("widgets  inc.", "exact", "Widgets Inc."),
         ("QuickShip Distributers", "alias", "FastShip Ltd."),
         ("Widgets lnc.", "lookalike", "Widgets Inc."),
-        ("\uff37idgets Inc.", "exact", "Widgets Inc."),  # full-width W folds under NFKC
+        ("\uff37idgets Inc.", "lookalike", "Widgets Inc."),  # full-width W: equal only after folding (B4)
         ("NoProd Industries", "unknown", None),
         ("", "missing", None),
     ],

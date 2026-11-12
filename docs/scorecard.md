@@ -14,7 +14,7 @@ Expectations: [eval/expected_outcomes.yaml](../eval/expected_outcomes.yaml).
 | invoice_1006.csv | PASS | paid | paid | rules | - |
 | invoice_1007.csv | PASS | rejected | rejected | rules | ARITHMETIC_MISMATCH, STOCK_EXCEEDED |
 | invoice_1008.txt | PASS | rejected | rejected | rules | NEAR_THRESHOLD, PAST_DUE, UNKNOWN_ITEM, UNKNOWN_VENDOR, VENDOR_RISK |
-| invoice_1009.json | PASS | rejected | rejected | rules | ARITHMETIC_MISMATCH, MISSING_DUE_DATE, MISSING_VENDOR, NEGATIVE_QUANTITY |
+| invoice_1009.json | PASS | rejected | rejected | rules | ARITHMETIC_MISMATCH, MISSING_DUE_DATE, MISSING_VENDOR, NEGATIVE_QUANTITY, NON_POSITIVE_TOTAL |
 | invoice_1010.txt | PASS | paid | paid | vp_agent | PRICE_OVER_CATALOG |
 | invoice_1011.pdf | PASS | paid | paid | rules | - |
 | invoice_1011.txt | PASS | duplicate_skipped | duplicate_skipped | ledger | - |

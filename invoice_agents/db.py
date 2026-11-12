@@ -1,7 +1,8 @@
 """SQLite store: inventory, vendors, ledger, append-only event log and inbox.
 
-Every state change goes through :func:`record`, which appends an event and
-updates the invoice's status row in one transaction (D25). Triggers make the
+Status changes go through :func:`record`, which appends an event and updates
+the invoice's status row in one transaction (D25); payment and inbox rows are
+written in the same transaction as their event. Triggers make the
 event table append-only.
 """
 
@@ -23,26 +24,28 @@ CREATE TABLE IF NOT EXISTS vendors (
 CREATE TABLE IF NOT EXISTS fx_rates (
     currency TEXT PRIMARY KEY, usd_rate TEXT NOT NULL, as_of TEXT NOT NULL, source TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS invoices (
-    vendor TEXT NOT NULL, invoice_number TEXT NOT NULL, revision INTEGER NOT NULL,
+    vendor TEXT NOT NULL COLLATE NOCASE, invoice_number TEXT NOT NULL COLLATE NOCASE, revision INTEGER NOT NULL,
     status TEXT NOT NULL, content_hash TEXT, core TEXT, total TEXT, currency TEXT, source_path TEXT,
     updated_at TEXT NOT NULL, PRIMARY KEY (vendor, invoice_number));
 CREATE TABLE IF NOT EXISTS invoice_events (
     id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT NOT NULL, run_id TEXT NOT NULL,
-    vendor TEXT NOT NULL, invoice_number TEXT NOT NULL, revision INTEGER NOT NULL,
+    vendor TEXT NOT NULL COLLATE NOCASE, invoice_number TEXT NOT NULL COLLATE NOCASE, revision INTEGER NOT NULL,
     event TEXT NOT NULL, actor TEXT NOT NULL, payload TEXT NOT NULL);
 CREATE TRIGGER IF NOT EXISTS events_no_update BEFORE UPDATE ON invoice_events
     BEGIN SELECT RAISE(ABORT, 'invoice_events is append-only'); END;
 CREATE TRIGGER IF NOT EXISTS events_no_delete BEFORE DELETE ON invoice_events
     BEGIN SELECT RAISE(ABORT, 'invoice_events is append-only'); END;
 CREATE TABLE IF NOT EXISTS findings (
-    run_id TEXT NOT NULL, vendor TEXT NOT NULL, invoice_number TEXT NOT NULL, revision INTEGER NOT NULL,
+    run_id TEXT NOT NULL, vendor TEXT NOT NULL COLLATE NOCASE, invoice_number TEXT NOT NULL COLLATE NOCASE,
+    revision INTEGER NOT NULL,
     rule_id TEXT NOT NULL, severity TEXT NOT NULL, message TEXT NOT NULL, evidence TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS payments (
-    vendor TEXT NOT NULL, invoice_number TEXT NOT NULL, revision INTEGER NOT NULL,
+    vendor TEXT NOT NULL COLLATE NOCASE, invoice_number TEXT NOT NULL COLLATE NOCASE, revision INTEGER NOT NULL,
     amount_paid TEXT NOT NULL, currency TEXT NOT NULL, usd_equivalent TEXT NOT NULL, ts TEXT NOT NULL,
     UNIQUE (vendor, invoice_number, revision));
 CREATE TABLE IF NOT EXISTS inbox (
-    id INTEGER PRIMARY KEY AUTOINCREMENT, vendor TEXT NOT NULL, invoice_number TEXT NOT NULL,
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    vendor TEXT NOT NULL COLLATE NOCASE, invoice_number TEXT NOT NULL COLLATE NOCASE,
     revision INTEGER NOT NULL, reason TEXT NOT NULL, label TEXT, status TEXT NOT NULL DEFAULT 'open',
     created_ts TEXT NOT NULL, resolved_ts TEXT, note TEXT, amount_due TEXT);
 """

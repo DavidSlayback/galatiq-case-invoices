@@ -5,7 +5,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from decimal import Decimal
 
-from invoice_agents import db
+from invoice_agents import db, ledger
 from invoice_agents.models import EventType, InvoiceKey, Status
 
 ATTEMPTS = 2  # A7
@@ -25,14 +25,6 @@ class PaymentResult:
 
     status: Status
     amount: Decimal
-
-
-def already_paid(conn: sqlite3.Connection, vendor: str, invoice_number: str) -> Decimal:
-    """Total paid so far across every revision of one invoice."""
-    rows = conn.execute(
-        "SELECT amount_paid FROM payments WHERE vendor=? AND invoice_number=?", (vendor, invoice_number)
-    ).fetchall()
-    return sum((Decimal(r[0]) for r in rows), Decimal(0))
 
 
 def pay(
@@ -65,7 +57,11 @@ def pay(
     if conn.execute("SELECT 1 FROM payments WHERE vendor=? AND invoice_number=? AND revision=?", tuple(key)).fetchone():
         db.record(conn, key, EventType.PAYMENT_SKIPPED_ALREADY_PAID, actor="payment", run_id=run_id)
         return PaymentResult(Status.PAID, Decimal(0))
-    amount = total - already_paid(conn, key.vendor, key.invoice_number)
+    amount = total - ledger.already_paid(conn, key.vendor, key.invoice_number)
+    if amount <= 0:  # B6: a revision below what was paid is a credit to recover, never a bank payment
+        db.record(conn, key, EventType.PAYMENT_SKIPPED_ALREADY_PAID, actor="payment", run_id=run_id,
+                  payload={"credit_due": str(-amount)})  # fmt: skip
+        return PaymentResult(Status.PAID, Decimal(0))
     errors: list[str] = []
     for _ in range(ATTEMPTS):
         try:

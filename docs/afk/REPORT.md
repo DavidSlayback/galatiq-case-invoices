@@ -1,3 +1,46 @@
-# Report
+# AFK run report
 
-Run started 2026-11-12.
+Run started and finished on 2026-11-12 (one session, with one restart). All 19 tickets were verified and published as stacked draft PRs #1–#20 (#3 is the GitHub stack object). Per-ticket evidence is in [evidence/](evidence/); branches and PRs are in [STACK.md](STACK.md).
+
+## Outcome
+
+- **Offline eval:** 27/27. That is 20 brief samples, 6 adversarial invoices and 1 scan; outcomes were 9 paid, 8 rejected, 6 escalated and 4 duplicates skipped.
+- **Live eval:**
+  - Grok 4.7 via Cursor scored 26/27, with extraction identical on all 27. Its one miss (1012) is now routed by D33.
+  - Claude Haiku scored 27/27 after three fixes (D33–D35).
+- **Gate:** `scripts/check-all` passes: ruff, pyright strict, 261 tests and a check for stale goldens. Pre-commit runs the same checks.
+- **Deliverables:**
+  - README;
+  - presentation Artifact, https://claude.ai/artifact/Uk4Fdc3Wff3zQPaVSpUghN;
+  - demo video, `docs/demo/demo.mp4` (2:32);
+  - dashboard screenshots in `docs/img/`.
+
+## Verification depth
+
+- **Full fresh-context verifier** for the parsers that take untrusted input (04 loaders, 05 extraction, 15 scans). Each first pass found real defects, all fixed with regression tests:
+  - UTF-16 XML getting past the entity ban;
+  - a byte-order mark emptying the CSV parse;
+  - a FIFO path hanging the loader;
+  - `1.234,56` parsing as 1.23;
+  - accounting negatives losing their sign;
+  - a 200-inch PDF page using 4.6 GB while rendering;
+  - 300-page PDFs;
+  - decoy text layers skipping the image path.
+- **Self-check plus a mutation test on every guard** for the other tickets: each guard test was shown to fail when its guard was removed.
+- **A fresh-context queue review** before the run found 14 planning defects. Among them were 1007's wrong stated total and the ±1-day terms tolerance.
+
+## Decisions made during the run (agent; flagged for David in DECISIONS.md)
+
+- **D25a–D30:** queue-review fixes (event types, terms tolerance, boundaries, fixed VP outcomes, payment currency, 1007's total). 1013's $50-high total was found by the code itself and added to D30.
+- **D33:** vendor-master changes go to a person (both live models approved 1012).
+- **D34:** re-check implausible due dates.
+- **D35:** strip "(formerly X)" from vendor names.
+
+## Human-only items left
+
+- Optional: `sudo apt install tesseract-ocr`, to enable the local-OCR path (its test is skipped without it).
+- An xAI API key would let the xAI API path run live; it is configured but unexercised.
+
+## Close-out
+
+See the end of this file, filled in once the merge and the final gate are done.

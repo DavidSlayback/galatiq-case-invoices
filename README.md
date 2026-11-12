@@ -31,7 +31,7 @@ No API key or login is needed. With nothing configured, the system replays recor
 | Claude via the Anthropic API | `ANTHROPIC_API_KEY` is set |
 | Grok via a Cursor plan | `cursor-agent` is installed → `cli:cursor:grok-4.7-medium-fast` |
 | Claude via a Claude plan | `claude` is installed → `cli:claude:haiku` |
-| Offline replay | none of the above, or `--offline` |
+| Offline replay | none of the above, or `--offline` (use it if a CLI is installed but not logged in) |
 
 ## How it works
 
@@ -44,7 +44,7 @@ flowchart LR
     R -- no, retry ≤2 with the numbers --> X
     R -- yes, or still wrong → finding --> D{Ledger:<br/>seen before?}
     D -- duplicate --> SKIP[Skipped, never paid twice]
-    D -- new or revision --> V[32 validation rules<br/>stock, prices, dates,<br/>vendor risk, fraud]
+    D -- new or revision --> V[35 validation rules<br/>stock, prices, dates,<br/>vendor risk, fraud]
     V --> T{Route}
     T -- hard failure --> REJ[Reject with reasons]
     T -- clean, < $10K --> PAY[Pay once]
@@ -66,13 +66,13 @@ The full state graph is generated from the code: [docs/graph.mmd](docs/graph.mmd
 - **Two self-correction loops:**
   - When the totals don't reconcile, the extractor is shown the specific numbers and asked again.
   - The VP answers the critic's objections for up to two rounds.
-- **Rules in code, judgement in agents:** 32 rules with stable IDs ([docs/RULES.md](docs/RULES.md)).
+- **Rules in code, judgement in agents:** 35 rules with stable IDs ([docs/RULES.md](docs/RULES.md)).
   - Hard rules reject before any agent sees the invoice, and a guardrail makes approving with a hard finding impossible, for humans too.
   - Fraud signals and vendor-master changes always go to a person.
 - **Untrusted input:**
-  - Invoice text is data, never instructions: injected "approve this" text is caught by a rule whatever the model does.
+  - Invoice text is data, never instructions: a rule scans the raw document and every extracted field for injected "approve this" text, whatever the model copied.
   - XML entities, decoy PDF text layers, oversized scans and 300-page PDFs are refused or capped.
-  - The CLI backends run sandboxed: read-only, tools off, in an empty temp dir.
+  - The CLI backends run without write or shell tools, from an empty temp dir, with the prompt on stdin. Read-only modes can still read other local files, so don't run them on a machine with secrets an injected invoice could ask about.
 - **Ledger:**
   - Events are append-only; an UPDATE or DELETE raises.
   - Duplicates are matched on content, not file bytes.
@@ -83,8 +83,8 @@ The full state graph is generated from the code: [docs/graph.mmd](docs/graph.mmd
 **Offline (deterministic, part of the test suite):** 27/27 ([docs/scorecard.md](docs/scorecard.md)).
 
 **Live** ([docs/live/README.md](docs/live/README.md)):
-- **Grok 4.7 via Cursor:** extraction identical to the goldens on all 27 files.
-- **Claude Haiku:** 27/27, also identical on all 27.
+- **Grok 4.7 via Cursor:** the core extracted fields (vendor, number, dates, lines, total) match the goldens on all 27 files.
+- **Claude Haiku:** 27/27, with the same core-field match on all 27.
 - Both read the scanned PDF from its image, and both treated the prompt-injection text as data.
 
 Traps in the data, including several the brief's table doesn't mention:

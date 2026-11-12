@@ -47,10 +47,12 @@ def match(name: str | None, known: dict[str, str], aliases: dict[str, str]) -> V
     n = norm(name)
     if not n:
         return VendorMatch("missing")
-    if n in known:
-        return VendorMatch("exact", known[n])
-    if n in aliases:
-        return VendorMatch("alias", aliases[n])
+    plain = re.sub(r"\s+", " ", (name or "").strip().lower())
+    if n in known or n in aliases:
+        # Equal only after NFKC folding (full-width or other look-alike code points): impersonation (B4).
+        if plain != n:
+            return VendorMatch("lookalike", known.get(n) or aliases[n])
+        return VendorMatch("exact", known[n]) if n in known else VendorMatch("alias", aliases[n])
     # 'Widgets lnc.' (lower-case L for I) is one edit from 'Widgets Inc.'.
     near = [(distance(n, k), v) for k, v in known.items() if abs(len(k) - len(n)) <= LOOKALIKE_DISTANCE]
     best = min(near, default=None)

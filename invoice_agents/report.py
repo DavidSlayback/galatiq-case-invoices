@@ -19,7 +19,6 @@ STATUS_STYLE = {
     Status.REJECTED: "bold red",
     Status.ESCALATED: "bold yellow",
     Status.DUPLICATE_SKIPPED: "bold cyan",
-    Status.SUPERSEDED: "bold cyan",
 }
 SEVERITY_STYLE = {"hard": "red", "fraud": "magenta", "soft": "yellow", "note": "dim"}
 

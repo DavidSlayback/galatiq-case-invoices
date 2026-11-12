@@ -1,4 +1,4 @@
-"""Ledger identity, duplicate detection and revisions (D2, D25, A8).
+"""Ledger identity, duplicate detection, revisions and what has been paid (D2, D25, A8).
 
 An invoice is keyed by vendor + invoice number; the revision is carried
 alongside. Duplicates are judged on a *core fingerprint* of the extracted
@@ -8,6 +8,7 @@ and even in which optional fields they state (1011's PDF has no subtotal).
 
 import json
 import sqlite3
+import unicodedata
 from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Any
@@ -19,7 +20,8 @@ CORE_FIELDS = ("vendor", "invoice_number", "revision", "invoice_date", "due_date
 
 def key_for(inv: Invoice, file_sha256: str) -> InvoiceKey:
     """Ledger key for an extracted invoice; placeholders keep unidentifiable invoices distinct."""
-    vendor = (inv.vendor or "").strip() or "(missing vendor)"
+    # NFKC + collapsed spaces here, case-insensitive columns in the DB: "WIDGETS  INC." is Widgets Inc. (B1).
+    vendor = " ".join(unicodedata.normalize("NFKC", inv.vendor or "").split()) or "(missing vendor)"
     number = (inv.invoice_number or "").strip() or f"(no number {file_sha256[:8]})"
     return InvoiceKey(vendor, number, inv.revision)
 
@@ -110,16 +112,13 @@ def check(conn: sqlite3.Connection, key: InvoiceKey, inv: Invoice) -> Check:
         return Conflict(bad) if bad else Duplicate(row["status"], row["source_path"])
     if inv.revision < row["revision"]:
         return Stale(row["revision"])
-    paid = conn.execute(
-        "SELECT amount_paid FROM payments WHERE vendor=? AND invoice_number=?", (key.vendor, key.invoice_number)
-    ).fetchall()
     inbox = conn.execute(
         "SELECT id FROM inbox WHERE vendor=? AND invoice_number=? AND status='open'", (key.vendor, key.invoice_number)
     ).fetchall()
     return Revision(
         previous_revision=row["revision"],
         changes=diff(old, new),
-        already_paid=sum((Decimal(r[0]) for r in paid), Decimal(0)),
+        already_paid=already_paid(conn, key.vendor, key.invoice_number),
         open_inbox_ids=[r[0] for r in inbox],
     )
 
@@ -150,3 +149,20 @@ def split_findings(conn: sqlite3.Connection, key: InvoiceKey, inv: Invoice, limi
             evidence={"with": [n for n, _ in siblings], "combined": str(combined)},
         )
     ]  # fmt: skip
+
+
+CONFLICT_SUFFIX = " (conflict "
+
+
+def base_number(invoice_number: str) -> str:
+    """The invoice number without the suffix a conflicting copy gets."""
+    return invoice_number.split(CONFLICT_SUFFIX)[0]
+
+
+def already_paid(conn: sqlite3.Connection, vendor: str, invoice_number: str) -> Decimal:
+    """Total paid so far across every revision and copy of one invoice (B7: conflicts count too)."""
+    rows = conn.execute(
+        "SELECT amount_paid FROM payments WHERE vendor=? AND (invoice_number=? OR invoice_number LIKE ?)",
+        (vendor, base_number(invoice_number), base_number(invoice_number) + CONFLICT_SUFFIX + "%"),
+    ).fetchall()
+    return sum((Decimal(r[0]) for r in rows), Decimal(0))

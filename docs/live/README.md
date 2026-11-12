@@ -2,7 +2,7 @@
 
 Every sample and adversarial invoice (27 files) run against real models through the subscription CLIs (D31), 2026-11-12. Scorecards: [Grok](scorecard-grok.md) · [Haiku](scorecard-haiku.md). Each extraction is recorded under `fixtures/recorded/<backend>/`.
 
-| Backend | Result | Extraction vs goldens | Calls | Tokens | Time |
+| Backend | Result | Core fields vs goldens | Calls | Tokens | Time |
 |---|---|---|---|---|---|
 | Grok 4.7 medium-fast via Cursor (`cli:cursor:grok-4.7-medium-fast`) | 26/27 on the first pass; the only miss was 1012, now routed by D33 | identical on all 27 | 42 | 573,905* | 11.7 min |
 | Claude Haiku via Claude Code (`cli:claude:haiku`), first pass | 24/27 | 2 differences, both fixed (see below) | 45 | 43,310 | 4.4 min |

@@ -17,6 +17,7 @@ from decimal import Decimal
 from invoice_agents import fx, vendors
 from invoice_agents.approval import AUTO_LIMIT
 from invoice_agents.models import Finding, Invoice, Severity
+from invoice_agents.reconcile import net_days
 
 NEAR_THRESHOLD_FROM = Decimal("9500")  # D27: 9,500 <= total < 10,000
 PRICE_TOLERANCE = Decimal("0.05")  # D6: >5% over catalog
@@ -60,6 +61,7 @@ class Ctx:
     invoice: Invoice
     ref: Reference
     as_of: date
+    text: str = ""  # the document text, for checks that must not depend on what the model copied
 
     def usd(self, amount: Decimal | None) -> Decimal | None:
         """Amount converted to USD at the mock rate."""
@@ -69,9 +71,7 @@ class Ctx:
 Rule = Callable[[Ctx], list[Finding]]
 
 
-def norm(name: str | None) -> str:
-    """Comparison form of a vendor name."""
-    return re.sub(r"\s+", " ", (name or "").strip().lower())
+norm = vendors.norm  # one normaliser for every vendor comparison (B4)
 
 
 def _f(rule_id: str, severity: Severity, message: str, **evidence: object) -> Finding:
@@ -144,6 +144,13 @@ def missing_fields(c: Ctx) -> list[Finding]:
         out.append(_f("MISSING_TOTAL", "hard", "total amount is missing"))
     if not inv.lines:
         out.append(_f("NO_LINE_ITEMS", "hard", "no line items"))
+    if inv.total is not None and inv.total <= 0:  # B6: nothing to pay; a credit note is a different flow
+        out.append(_f("NON_POSITIVE_TOTAL", "hard", f"total {inv.total} is not a payable amount"))
+    out += [
+        _f("NEGATIVE_PRICE", "hard", f"'{ln.item_raw}' has unit price {ln.unit_price}", item=ln.item_raw)
+        for ln in inv.lines
+        if ln.unit_price is not None and ln.unit_price < 0
+    ]
     return out
 
 
@@ -163,8 +170,15 @@ def price_vs_catalog(c: Ctx) -> list[Finding]:
     out: list[Finding] = []
     for ln in c.invoice.lines:
         cat = c.ref.price.get(ln.sku or "")
-        usd = c.usd(ln.unit_price)
-        if not cat or usd is None:
+        if not cat:
+            continue
+        # B2: a line stating only an amount is priced from it; a line with no price at all is flagged.
+        unit = ln.unit_price if ln.unit_price is not None else (
+            ln.amount / ln.quantity if ln.amount is not None and ln.quantity > 0 else None
+        )  # fmt: skip
+        usd = c.usd(unit)
+        if usd is None:
+            out.append(_f("PRICE_UNVERIFIABLE", "soft", f"'{ln.item_raw}' states no price", item=ln.item_raw))
             continue
         if usd > cat * (1 + PRICE_TOLERANCE):
             pct = (usd / cat - 1) * 100
@@ -182,12 +196,6 @@ def near_threshold(c: Ctx) -> list[Finding]:
     if t is not None and NEAR_THRESHOLD_FROM <= t < AUTO_LIMIT:
         return [_f("NEAR_THRESHOLD", "soft", f"total {t} USD is just under the {AUTO_LIMIT} limit", total=str(t))]
     return []
-
-
-def net_days(terms: str | None) -> int | None:
-    """Days from 'Net N' terms, if stated."""
-    m = re.search(r"net\s*(\d+)", terms or "", re.IGNORECASE)
-    return int(m.group(1)) if m else None
 
 
 def due_dates(c: Ctx) -> list[Finding]:
@@ -262,9 +270,11 @@ INJECTION = re.compile(
 
 def prompt_injection(c: Ctx) -> list[Finding]:
     """Text addressed to an AI reviewer inside an invoice is an attack, whatever the model did with it (NFR-8)."""
-    text = " ".join(
-        x for x in (c.invoice.notes, c.invoice.payment_terms, *(ln.item_raw for ln in c.invoice.lines)) if x
-    )
+    # B5: scan the raw document and every extracted string, not only the fields the model chose for notes.
+    inv = c.invoice
+    fields = (inv.vendor, inv.vendor_address, inv.notes, inv.payment_terms, inv.remit_to, inv.due_date_raw)
+    lines = [x for ln in inv.lines for x in (ln.item_raw, ln.note)]
+    text = "\n".join(x for x in (c.text, *fields, *lines) if x)  # one field per line keeps "^SYSTEM:" anchored
     hits = sorted({m.group(0).strip() for m in INJECTION.finditer(text)})
     if not hits:
         return []
@@ -310,12 +320,12 @@ RULES: list[Rule] = [
 ]
 
 
-def validate(invoice: Invoice, conn: sqlite3.Connection, as_of: date) -> list[Finding]:
-    """Run every registered rule against one invoice."""
-    return check(invoice, Reference.load(conn), as_of)
+def validate(invoice: Invoice, conn: sqlite3.Connection, as_of: date, text: str = "") -> list[Finding]:
+    """Run every registered rule against one invoice (``text`` is the source document, for injection checks)."""
+    return check(invoice, Reference.load(conn), as_of, text)
 
 
-def check(invoice: Invoice, ref: Reference, as_of: date) -> list[Finding]:
+def check(invoice: Invoice, ref: Reference, as_of: date, text: str = "") -> list[Finding]:
     """Run every rule against pre-loaded reference data (pure)."""
-    ctx = Ctx(invoice, ref, as_of)
+    ctx = Ctx(invoice, ref, as_of, text)
     return [f for rule in RULES for f in rule(ctx)]

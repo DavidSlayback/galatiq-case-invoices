@@ -2,7 +2,7 @@ import json
 import sqlite3
 from decimal import Decimal
 
-from invoice_agents import db, graph, payment
+from invoice_agents import db, graph, ledger, payment
 from invoice_agents.models import InvoiceKey, Status
 from invoice_agents.settings import Settings
 from tests.conftest import INVOICES
@@ -36,7 +36,7 @@ def test_revision_pays_only_the_difference(conn: sqlite3.Connection):
     payment.pay(conn, KEY, Decimal("1890.00"), "USD", None, "r1", bank)
     payment.pay(conn, KEY._replace(revision=1), Decimal("5940.00"), "USD", None, "r2", bank)
     assert [a for _, a in calls] == [Decimal("1890.00"), Decimal("4050.00")]
-    assert payment.already_paid(conn, KEY.vendor, KEY.invoice_number) == Decimal("5940.00")
+    assert ledger.already_paid(conn, KEY.vendor, KEY.invoice_number) == Decimal("5940.00")
 
 
 def test_failures_retry_then_escalate(conn: sqlite3.Connection):

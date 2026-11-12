@@ -80,18 +80,34 @@ def list_open(conn: sqlite3.Connection) -> list[Item]:
     return out
 
 
-def _find(conn: sqlite3.Connection, invoice_number: str) -> sqlite3.Row:
-    rows = conn.execute("SELECT * FROM inbox WHERE invoice_number=? ORDER BY id DESC", (invoice_number,)).fetchall()
+def _find(conn: sqlite3.Connection, invoice_number: str, vendor: str | None, inbox_id: int | None) -> sqlite3.Row:
+    if inbox_id is not None:
+        rows = conn.execute("SELECT * FROM inbox WHERE id=?", (inbox_id,)).fetchall()
+    else:
+        sql, args = "SELECT * FROM inbox WHERE invoice_number=?", [invoice_number]
+        if vendor:
+            sql, args = sql + " AND vendor=?", [*args, vendor]
+        rows = conn.execute(sql + " ORDER BY id DESC", args).fetchall()
     if not rows:
         raise InboxError(f"{invoice_number} is not in the inbox")
     open_rows = [r for r in rows if r["status"] == "open"]
     if not open_rows:
         raise InboxError(f"{invoice_number} is not open (status: {rows[0]['status']}; {rows[0]['note'] or ''})")
+    if len({r["vendor"].lower() for r in open_rows}) > 1:  # B3: never guess which vendor's invoice to pay
+        names = ", ".join(sorted({r["vendor"] for r in open_rows}))
+        raise InboxError(f"{invoice_number} is open for several vendors ({names}); name the vendor")
     return open_rows[0]
 
 
 def resolve(
-    conn: sqlite3.Connection, invoice_number: str, *, approve: bool, note: str, reviewer: str
+    conn: sqlite3.Connection,
+    invoice_number: str,
+    *,
+    approve: bool,
+    note: str,
+    reviewer: str,
+    vendor: str | None = None,
+    inbox_id: int | None = None,
 ) -> dict[str, Any]:
     """Approve (and pay) or reject one escalated invoice.
 
@@ -101,6 +117,8 @@ def resolve(
         approve: True to approve and pay, False to reject.
         note: Required justification, stored on the event.
         reviewer: Who decided, e.g. ``human:cli``.
+        vendor: Disambiguates when two vendors use the same invoice number.
+        inbox_id: The exact inbox item (the dashboard passes this).
 
     Returns:
         What happened: status, and the amount paid if any.
@@ -110,7 +128,7 @@ def resolve(
     """
     if not note.strip():
         raise InboxError("a note is required for every human decision")
-    r = _find(conn, invoice_number)
+    r = _find(conn, invoice_number, vendor, inbox_id)
     key = InvoiceKey(r["vendor"], r["invoice_number"], r["revision"])
     inv = db.invoice_row(conn, key.vendor, key.invoice_number)
     hard = [f["rule_id"] for f in _latest_findings(conn, key) if f["severity"] == "hard"]

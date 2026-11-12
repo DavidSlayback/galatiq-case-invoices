@@ -11,6 +11,14 @@ from decimal import Decimal
 from invoice_agents.models import Invoice
 
 CENT = Decimal("0.01")
+
+
+def net_days(terms: str | None) -> int | None:
+    """Days from 'Net N' terms, if stated."""
+    m = re.search(r"net\s*(\d+)", terms or "", re.IGNORECASE)
+    return int(m.group(1)) if m else None
+
+
 DATE_SLACK_DAYS = 45  # beyond any genuine terms variance in the samples (largest is -30, 1002)
 
 
@@ -25,10 +33,10 @@ def implausible_dates(inv: Invoice) -> list[str]:
 
     Unlike arithmetic, these never become a finding by themselves; the date rules judge the final values.
     """
-    m = re.search(r"net\s*(\d+)", inv.payment_terms or "", re.IGNORECASE)
-    if not (m and inv.invoice_date and inv.due_date):
+    days = net_days(inv.payment_terms)
+    if days is None or not (inv.invoice_date and inv.due_date):
         return []
-    expected = inv.invoice_date + timedelta(days=int(m.group(1)))
+    expected = inv.invoice_date + timedelta(days=days)
     gap = (inv.due_date - expected).days
     if abs(gap) <= DATE_SLACK_DAYS:
         return []

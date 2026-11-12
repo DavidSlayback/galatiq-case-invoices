@@ -8,6 +8,9 @@ agents, validators and retry loops do not know a CLI is answering.
 Sandboxing matters: invoice text is untrusted, and both CLIs are agents that
 can act. Cursor runs in read-only ``ask`` mode; Claude runs with no tools (or
 ``Read`` only, for page images), no MCP servers, no settings and no saved session.
+Neither can write or run commands. Read-only modes can still read files outside
+the temp dir, so do not run the CLI backends on a machine holding secrets that an
+injected invoice could ask the model to quote.
 """
 
 import asyncio
@@ -78,7 +81,7 @@ class CliBackend:
             argv = self.argv(prompt, info.instructions or "", out_tool.parameters_json_schema, bool(images))
             call = CliCall(argv=argv, cwd=cwd, images=len(images))
             self.calls.append(call)
-            stdout, stderr, rc, call.seconds = await _run(argv, cwd, self.timeout_s)
+            stdout, stderr, rc, call.seconds = await _run(argv, cwd, self.timeout_s, prompt)
         if QUOTA.search(stderr) or (rc != 0 and QUOTA.search(stdout)):
             raise BackendQuotaError(f"{self.tool} reported a quota or rate limit: {(stderr or stdout)[:300]}")
         try:
@@ -99,13 +102,13 @@ class CliBackend:
         if self.tool == "cursor":
             # Cursor has no separate system prompt or schema flag; both go into the prompt.
             return ["cursor-agent", "-p", "--trust", "--mode", "ask", "--output-format", "json",
-                    "--model", self.model, prompt]  # fmt: skip
+                    "--model", self.model]  # fmt: skip
         return [
             "claude", "-p", "--output-format", "json", "--model", self.model,
             "--tools", "Read" if images else "",
             "--strict-mcp-config", "--setting-sources", "", "--no-session-persistence",
             "--system-prompt", system or "Return only the requested JSON.",
-            "--json-schema", json.dumps(schema), prompt,
+            "--json-schema", json.dumps(schema),
         ]  # fmt: skip
 
     def parse(self, stdout: str) -> tuple[dict[str, Any], int, int]:
@@ -190,17 +193,20 @@ def render(
     return "\n\n".join(out), images
 
 
-async def _run(argv: list[str], cwd: str, timeout_s: int) -> tuple[str, str, int, float]:
+async def _run(argv: list[str], cwd: str, timeout_s: int, prompt: str) -> tuple[str, str, int, float]:
+    """Run the CLI with the prompt on stdin: an argv string is capped at 128 KiB on Linux (B8)."""
     t0 = time.perf_counter()
     try:
         proc = await asyncio.create_subprocess_exec(
-            *argv, cwd=cwd, stdin=asyncio.subprocess.DEVNULL,
+            *argv, cwd=cwd, stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
         )  # fmt: skip
     except FileNotFoundError:
         return "", f"{argv[0]} is not installed", 127, 0.0
+    except OSError as e:
+        return "", f"{argv[0]} could not start: {e}", 126, 0.0
     try:
-        out, err = await asyncio.wait_for(proc.communicate(), timeout_s)
+        out, err = await asyncio.wait_for(proc.communicate(prompt.encode()), timeout_s)
     except TimeoutError:
         proc.kill()
         await proc.wait()

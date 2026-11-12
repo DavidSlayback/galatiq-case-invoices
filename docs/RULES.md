@@ -20,8 +20,10 @@ Code: [invoice_agents/rules.py](../invoice_agents/rules.py). `ARITHMETIC_MISMATC
 | `MISSING_VENDOR` | hard | Vendor name is blank | Can't pay an unknown payee | 1009 |
 | `MISSING_DUE_DATE` | hard | No due date at all | Required field | 1009 |
 | `MISSING_TOTAL` / `NO_LINE_ITEMS` | hard | No total, or no lines | Required fields | — |
+| `NON_POSITIVE_TOTAL` / `NEGATIVE_PRICE` | hard | Total ≤ 0, or a negative unit price | Not a payable invoice; a credit note is a different flow (D37) | 1009 |
 | `UNSUPPORTED_CURRENCY` | hard | No mock exchange rate for the currency | Can't price-check or tier it | — |
 | `PRICE_OVER_CATALOG` | soft | A unit price in USD is more than 5% above catalog | Overbilling (D6) | 1010 (rush line) |
+| `PRICE_UNVERIFIABLE` | soft | A stocked item with no unit price and no line amount to derive one from | An unchecked price must not auto-pay (D37) | — |
 | `NEAR_THRESHOLD` | soft | 9,500 ≤ USD total < 10,000 | Threshold-gaming signal (D27) | 1008, 1012 |
 | `DUE_BEFORE_INVOICE` | soft | Due date is on or before the invoice date | Inconsistent terms | 1002 |
 | `DUE_TERMS_MISMATCH` | soft | Due date is more than ±1 day from invoice date + Net N | Vendors count terms inclusively; ±1 is tolerated (D26) | 1001, 1002 |

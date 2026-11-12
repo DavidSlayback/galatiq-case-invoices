@@ -206,7 +206,7 @@ async def ledger_check(ctx: StepContext[State, Deps, Reconciled]) -> Reconciled 
         return DuplicateFound(inv, why)
     if isinstance(found, ledger.Conflict):
         # Keep the original's row intact: the conflicting copy gets its own ledger key.
-        s.key = s.key._replace(invoice_number=f"{s.key.invoice_number} (conflict {s.doc.file_sha256[:8]})")
+        s.key = s.key._replace(invoice_number=f"{s.key.invoice_number}{ledger.CONFLICT_SUFFIX}{s.doc.file_sha256[:8]})")
         msg = f"same invoice number and revision as one on file, but {', '.join(found.fields)} differ"
         s.findings.append(Finding(rule_id="DUPLICATE_NUMBER_CONFLICT", severity="fraud", message=msg,
                                   evidence={"fields": found.fields}))  # fmt: skip
@@ -263,7 +263,7 @@ async def validate(ctx: StepContext[State, Deps, Reconciled]) -> approval.Route:
     """Run the rules and pick the approval route."""
     s, d, inv = ctx.state, ctx.deps, ctx.inputs.invoice
     assert s.key is not None
-    s.findings += rules.validate(inv, d.conn, d.settings.as_of)
+    s.findings += rules.validate(inv, d.conn, d.settings.as_of, s.doc.text if s.doc else "")
     s.findings += ledger.split_findings(d.conn, s.key, inv, approval.AUTO_LIMIT)
     with d.conn:
         d.conn.executemany(

@@ -111,14 +111,11 @@ class Status(StrEnum):
     RECEIVED = "received"
     EXTRACTED = "extracted"
     VALIDATED = "validated"
-    APPROVED = "approved"
     REJECTED = "rejected"
     ESCALATED = "escalated"
     PAID = "paid"
     PAYMENT_FAILED = "payment_failed"
     DUPLICATE_SKIPPED = "duplicate_skipped"
-    SUPERSEDED = "superseded"
-    WITHDRAWN = "withdrawn"
 
 
 class EventType(StrEnum):
