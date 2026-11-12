@@ -14,7 +14,7 @@ from tests.conftest import INVOICES
 def test_1012_approved_by_human_is_paid(conn: sqlite3.Connection, offline: Settings):
     assert graph.process_sync(INVOICES / "invoice_1012.txt", offline, conn).status == Status.ESCALATED
     (item,) = inbox.list_open(conn)
-    assert item.reason == "vp_critic_disagree" and "VENDOR_RENAMED" in item.flags and item.risk == 20
+    assert item.reason == "vendor_change" and "VENDOR_RENAMED" in item.flags and item.risk == 20
     assert item.reasoning  # the reviewer sees why the agents could not settle it
     res = inbox.resolve(
         conn, "INV-1012", approve=True, note="Confirmed rename with FastShip by phone", reviewer="human:t"
@@ -75,7 +75,7 @@ def test_cli_review_flow(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     r = CliRunner()
     assert r.invoke(app, ["process", "data/invoices/invoice_1012.txt", "--offline", "--db", dbp]).exit_code == 0
     listing = r.invoke(app, ["review", "--db", dbp])
-    assert "INV-1012" in listing.output and "vp_critic_disagree" in listing.output
+    assert "INV-1012" in listing.output and "vendor_change" in listing.output
     assert r.invoke(app, ["review", "INV-1012", "--approve", "--db", dbp]).exit_code == 1  # no note
     ok = r.invoke(app, ["review", "INV-1012", "--approve", "--note", "confirmed", "--db", dbp])
     assert ok.exit_code == 0 and "paid" in ok.output

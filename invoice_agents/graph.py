@@ -161,9 +161,10 @@ async def reconcile_step(ctx: StepContext[State, Deps, Extracted]) -> Reconciled
     """Check the arithmetic; retry extraction with the specific mismatch, at most twice (D14)."""
     s, inv = ctx.state, ctx.inputs.invoice
     problems = reconcile.mismatches(inv)
-    ctx.deps.tracer.log("reconcile", attempt=s.attempt, mismatches=problems)
-    if problems and s.attempt < MAX_EXTRACT_RETRIES:
-        return Retry("\n".join(problems))
+    doubts = reconcile.implausible_dates(inv)
+    ctx.deps.tracer.log("reconcile", attempt=s.attempt, mismatches=problems, doubts=doubts)
+    if (problems or doubts) and s.attempt < MAX_EXTRACT_RETRIES:
+        return Retry("\n".join(problems + doubts))
     if problems:
         s.findings.append(
             Finding(

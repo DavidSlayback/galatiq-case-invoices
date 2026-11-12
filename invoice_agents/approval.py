@@ -12,6 +12,8 @@ AUTO_LIMIT = Decimal("10000")
 HUMAN_ABOVE = Decimal("50000")
 MAX_REVIEW_ROUNDS = 2
 FRAUD_LABEL = "suspected fraud"
+CHANGE_LABEL = "vendor change"
+VENDOR_MASTER_CHANGES = frozenset({"VENDOR_RENAMED"})
 
 
 @dataclass(frozen=True)
@@ -97,6 +99,11 @@ def route(invoice: Invoice, findings: list[Finding], usd_total: Decimal | None) 
     fraud = _ids(findings, "fraud")
     if fraud:
         return HumanReview(invoice, findings, usd_total, reason="fraud signals: " + ", ".join(fraud), label=FRAUD_LABEL)
+    master = [f for f in findings if f.rule_id in VENDOR_MASTER_CHANGES]
+    if master:
+        # D33: a change to who gets paid is confirmed by a person, not judged by an agent.
+        detail = tuple(f.message for f in master)
+        return HumanReview(invoice, findings, usd_total, reason="vendor_change", label=CHANGE_LABEL, detail=detail)
     if usd_total is None:
         return HumanReview(invoice, findings, usd_total, reason="total could not be determined in USD")
     if usd_total > HUMAN_ABOVE:

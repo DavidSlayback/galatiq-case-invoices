@@ -156,6 +156,24 @@ def _quantity(s: str) -> Decimal:
     return q
 
 
+_FORMERLY = re.compile(r"\s*\((?:formerly|previously|f/k/a|fka)\s+([^)]+)\)\s*", re.IGNORECASE)
+
+
+def vendor_name(s: str | None) -> str | None:
+    """Vendor name without a '(formerly X)' note, so a rename does not change the ledger key."""
+    return _blank(_FORMERLY.sub(" ", s or ""))
+
+
+def former_name(s: str | None) -> str | None:
+    """The former name from a '(formerly X)' note, if any."""
+    m = _FORMERLY.search(s or "")
+    return f"Formerly {m.group(1).strip()}" if m else None
+
+
+def _join_notes(*parts: str | None) -> str | None:
+    return _blank(" ".join(p for p in parts if p and p.strip()))
+
+
 def _blank(s: str | None) -> str | None:
     return s.strip() if s and s.strip() else None
 
@@ -179,7 +197,7 @@ def to_invoice(raw: RawExtraction) -> Invoice:
     ]
     due = parse_date(raw.due_date)
     inv = Invoice(
-        vendor=_blank(raw.vendor),
+        vendor=vendor_name(raw.vendor),
         vendor_address=_blank(raw.vendor_address),
         invoice_number=invoice_number(raw.invoice_number),
         revision=revision(raw.revision),
@@ -193,7 +211,7 @@ def to_invoice(raw: RawExtraction) -> Invoice:
         shipping=money(raw.shipping),
         total=money(raw.total),
         payment_terms=_blank(raw.payment_terms),
-        notes=_blank(raw.notes),
+        notes=_join_notes(raw.notes, former_name(raw.vendor)),
         remit_to=_blank(raw.remit_to),
     )
     provenance: dict[str, FieldSource] = {

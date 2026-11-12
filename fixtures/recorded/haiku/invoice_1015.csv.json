@@ -1,0 +1,60 @@
+{
+  "vendor": "Reliable Components Inc.",
+  "vendor_address": null,
+  "invoice_number": "INV-1015",
+  "revision": 0,
+  "invoice_date": "2026-01-29",
+  "due_date": "2026-02-28",
+  "due_date_raw": null,
+  "currency": "USD",
+  "lines": [
+    {
+      "item_raw": "WidgetA",
+      "sku": "WidgetA",
+      "quantity": "10",
+      "unit_price": "250.00",
+      "amount": "2500.00",
+      "note": null
+    },
+    {
+      "item_raw": "WidgetB",
+      "sku": "WidgetB",
+      "quantity": "5",
+      "unit_price": "500.00",
+      "amount": "2500.00",
+      "note": null
+    },
+    {
+      "item_raw": "GadgetX",
+      "sku": "GadgetX",
+      "quantity": "2",
+      "unit_price": "750.00",
+      "amount": "1500.00",
+      "note": null
+    }
+  ],
+  "subtotal": "6500.00",
+  "tax": "0.00",
+  "shipping": null,
+  "total": "6500.00",
+  "payment_terms": null,
+  "notes": "Tax line is labeled \"Tax (0%):\" with value 0.00. Document provides no vendor address, currency code, revision marker, payment terms, shipping charge, or remittance details.",
+  "remit_to": null,
+  "provenance": {
+    "vendor": "llm",
+    "vendor_address": "missing",
+    "invoice_number": "llm",
+    "revision": "missing",
+    "invoice_date": "llm",
+    "due_date": "llm",
+    "currency": "missing",
+    "lines": "llm",
+    "subtotal": "llm",
+    "tax": "llm",
+    "shipping": "missing",
+    "total": "llm",
+    "payment_terms": "missing",
+    "notes": "llm",
+    "remit_to": "missing"
+  }
+}

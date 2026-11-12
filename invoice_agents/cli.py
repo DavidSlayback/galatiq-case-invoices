@@ -108,11 +108,14 @@ def eval_cmd(
     scorecard: Annotated[Path | None, typer.Option(help="Write the Markdown scorecard here.")] = Path(
         "docs/scorecard.md"
     ),
+    record: Annotated[
+        Path | None, typer.Option(help="With a live model, save each extraction here to compare with the goldens.")
+    ] = None,
 ) -> None:
     """Score every sample invoice against eval/expected_outcomes.yaml (fresh database, fixed order)."""
     s = with_backend(build_settings(model, offline, None, None))
     try:
-        rows = eval_mod.run(s)
+        rows = eval_mod.run(s, record_dir=record)
     except BackendQuotaError as e:
         console.print(f"[red]Stopped: {e}[/red] Wait for the quota to reset or pick another --model.")
         raise typer.Exit(3) from e

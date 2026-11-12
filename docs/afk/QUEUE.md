@@ -1,6 +1,6 @@
 # Queue
 
-**Frontier:** 18, 16.
+**Frontier:** 16, then 19.
 
 | # | Ticket | Wave | Lane | Status |
 |---|---|---|---|---|
@@ -15,11 +15,11 @@
 | 09 | [eval](tickets/09-eval.md) | 5 | serial | done (#10) |
 | 10 | [ledger-batch](tickets/10-ledger-batch.md) | 6 | ledger | done (#13) |
 | 11 | [inbox-cli](tickets/11-inbox-cli.md) | 7 | inbox | done (#15) |
-| 12 | [streamlit](tickets/12-streamlit.md) | 8 | serial | done |
+| 12 | [streamlit](tickets/12-streamlit.md) | 8 | serial | done (#17) |
 | 13 | [vendor-risk](tickets/13-vendor-risk.md) | 6 | vendors | done (#14) |
 | 14 | [adversarial](tickets/14-adversarial.md) | 7 | adversarial | done (#16) |
 | 15 | [ocr-chain](tickets/15-ocr-chain.md) | 5 | ocr | done (#11) |
 | 16 | [cost-roi](tickets/16-cost-roi.md) | 9 | serial | todo |
 | 17 | [model-bridge](tickets/17-model-bridge.md) | 5 | models | done (#12) |
-| 18 | [live-model-pass](tickets/18-live-model-pass.md) | 8 | serial | todo (uses subscription quota, D31) |
+| 18 | [live-model-pass](tickets/18-live-model-pass.md) | 8 | serial | done |
 | 19 | [presentation](tickets/19-presentation.md) | 10 | serial | todo |

@@ -1,0 +1,52 @@
+{
+  "vendor": null,
+  "vendor_address": null,
+  "invoice_number": "INV-1009",
+  "revision": 0,
+  "invoice_date": "2026-01-15",
+  "due_date": null,
+  "due_date_raw": null,
+  "currency": "USD",
+  "lines": [
+    {
+      "item_raw": "WidgetA",
+      "sku": "WidgetA",
+      "quantity": "-5",
+      "unit_price": "250.00",
+      "amount": null,
+      "note": null
+    },
+    {
+      "item_raw": "WidgetB",
+      "sku": "WidgetB",
+      "quantity": "2",
+      "unit_price": "500.00",
+      "amount": null,
+      "note": null
+    }
+  ],
+  "subtotal": "1000.00",
+  "tax": "0.00",
+  "shipping": null,
+  "total": "-250.00",
+  "payment_terms": null,
+  "notes": "Values copied as stated in the document; they do not reconcile. Lines (WidgetA -5 x 250.00, WidgetB 2 x 500.00) sum to -250.00, but the stated subtotal is 1000.00 and the stated total is -250.00. Subtotal 1000.00 + tax 0.00 + shipping (none stated) does not equal the stated total -250.00. Vendor name is blank in the source document. Tax rate shown as 0.0. WidgetA quantity is -5 and the total is negative. Source document has no due date, payment terms, or remittance details.",
+  "remit_to": null,
+  "provenance": {
+    "vendor": "missing",
+    "vendor_address": "missing",
+    "invoice_number": "llm",
+    "revision": "missing",
+    "invoice_date": "llm",
+    "due_date": "missing",
+    "currency": "llm",
+    "lines": "llm",
+    "subtotal": "llm",
+    "tax": "llm",
+    "shipping": "missing",
+    "total": "llm",
+    "payment_terms": "missing",
+    "notes": "llm",
+    "remit_to": "missing"
+  }
+}

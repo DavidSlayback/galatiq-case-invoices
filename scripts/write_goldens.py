@@ -326,7 +326,7 @@ ADVERSARIAL: dict[str, dict[str, Any]] = {
 }
 EXTRACT.update(ADVERSARIAL)
 
-# D28: fixed VP-tier outcomes. 1001 and 1010 are approved; on 1012 the critic objects twice → inbox.
+# D28: fixed VP-tier outcomes. 1001 and 1010 are approved. (1012 goes straight to a person under D33.)
 AGREE = {"agrees": True, "objections": []}
 REVIEW: dict[str, tuple[list[dict[str, Any]], list[dict[str, Any]]]] = {
     "invoice_1001.txt": (
@@ -356,43 +356,6 @@ REVIEW: dict[str, tuple[list[dict[str, Any]], list[dict[str, Any]]]] = {
         [AGREE],
     ),
 }
-VP_1012 = [
-    {
-        "decision": "approve",
-        "reasons": [
-            "QuickShip states it was formerly FastShip Ltd., a known vendor, and quotes "
-            "PO-20260115; prices match the catalog."
-        ],
-        "cited_rule_ids": ["VENDOR_RENAMED", "NEAR_THRESHOLD"],
-    },
-    {
-        "decision": "approve",
-        "reasons": [
-            "The rename note and PO reference are consistent with the FastShip "
-            "relationship; the total is under the limit."
-        ],
-        "cited_rule_ids": ["VENDOR_RENAMED", "NEAR_THRESHOLD"],
-    },
-]
-CRITIC_1012 = [
-    {
-        "agrees": False,
-        "objections": [
-            "The vendor name is not in the registry; the rename claim comes only from the "
-            "invoice itself and is unverified.",
-            "The total sits $25 under the auto-approval limit.",
-        ],
-    },
-    {
-        "agrees": False,
-        "objections": [
-            "Paying a renamed payee on the invoice's own say-so is a known fraud pattern; "
-            "remit-to details must be confirmed with FastShip through a known contact before payment."
-        ],
-    },
-]
-REVIEW["invoice_1012.txt"] = (VP_1012, CRITIC_1012)
-REVIEW["invoice_1012.pdf"] = (VP_1012, CRITIC_1012)
 
 
 def write(kind: str, name: str, body: dict[str, Any]) -> None:

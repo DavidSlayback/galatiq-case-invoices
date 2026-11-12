@@ -65,6 +65,14 @@ Decisions from the grilling session on 2026-11-12. Each one comes from David unl
 | D31 | No API credits are bought. Live calls go through David's subscriptions: Grok 4.7 via `cursor-agent -p` (Cursor Pro) is the default, and Claude Haiku via `claude -p` (Claude Max) is the cross-check. Both are wrapped as a PydanticAI `FunctionModel` bridge, sandboxed in an empty temp dir with tools off or read-only. Unattended live runs are allowed (about 100–200 calls). | Uses the plans David already pays for and honours "use Grok". Invoices are untrusted, so the agent CLIs must not have tools that act. |
 | D32 | When no model is configured, pick one automatically: `XAI_API_KEY` → xAI API; another API key → that API; a logged-in `cursor-agent` or `claude` → the CLI bridge; otherwise `--offline` replay with a banner. | Graders without David's logins can always run it. |
 
+## After the live pass (2026-11-12, agent choices; flag if wrong)
+
+| # | Decision | Why / consequence |
+|---|---|---|
+| D33 | Vendor-master changes (`VENDOR_RENAMED`) go straight to a human, labelled "vendor change". This replaces D28's scripted VP/critic deadlock for 1012. | On the live pass both Grok and Haiku approved 1012, because the registry links QuickShip to FastShip. The decision belongs to a person confirming the change, not to model judgement. AP practice is to verify vendor-master changes out of band. |
+| D34 | The extractor's reconcile step also re-checks due dates more than 45 days off the stated terms (a likely wrong year). This never becomes a finding by itself. | Haiku misread 2026 as 2027 on the control invoice. |
+| D35 | A "(formerly X)" note is moved out of the vendor name into notes. | Haiku kept it in the name, which changed the ledger key and broke duplicate detection on 1012. |
+
 ## Agent choices (not decided by David; flag if wrong)
 
 - The VP critique loop and the extraction loop each allow at most 2 retries, as offered in the options David picked.

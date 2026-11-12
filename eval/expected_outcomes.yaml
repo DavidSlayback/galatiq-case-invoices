@@ -72,9 +72,10 @@ data/invoices/invoice_1011.txt:
 
 data/invoices/invoice_1012.pdf:
   status: escalated
+  decided_by: approval
   requires: [VENDOR_RENAMED, NEAR_THRESHOLD]
   forbids: [UNKNOWN_VENDOR, HIGH_VENDOR_RISK]
-  why: Renamed vendor plus $9,975; the VP approves, the critic objects twice, so it goes to a human (D28).
+  why: The vendor name changed (QuickShip, formerly FastShip). A vendor-master change goes to a person (D33).
 
 data/invoices/invoice_1012.txt:
   status: duplicate_skipped

@@ -4,17 +4,37 @@ Shared by the extraction self-correction loop and the ARITHMETIC_MISMATCH rule,
 so both judge consistency the same way.
 """
 
+import re
+from datetime import timedelta
 from decimal import Decimal
 
 from invoice_agents.models import Invoice
 
 CENT = Decimal("0.01")
+DATE_SLACK_DAYS = 45  # beyond any genuine terms variance in the samples (largest is -30, 1002)
 
 
 def _line_total(qty: Decimal, price: Decimal | None, amount: Decimal | None) -> Decimal | None:
     if amount is not None:
         return amount
     return None if price is None else qty * price
+
+
+def implausible_dates(inv: Invoice) -> list[str]:
+    """Dates far off the stated terms: likely misread (a wrong year), worth one more look.
+
+    Unlike arithmetic, these never become a finding by themselves; the date rules judge the final values.
+    """
+    m = re.search(r"net\s*(\d+)", inv.payment_terms or "", re.IGNORECASE)
+    if not (m and inv.invoice_date and inv.due_date):
+        return []
+    expected = inv.invoice_date + timedelta(days=int(m.group(1)))
+    gap = (inv.due_date - expected).days
+    if abs(gap) <= DATE_SLACK_DAYS:
+        return []
+    return [
+        f"due date {inv.due_date} is {gap:+d} days from {inv.payment_terms} after {inv.invoice_date}; check the year"
+    ]
 
 
 def mismatches(inv: Invoice) -> list[str]:
