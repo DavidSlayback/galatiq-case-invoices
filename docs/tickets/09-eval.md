@@ -12,7 +12,7 @@ eval/expected_outcomes.yaml, invoice_agents/eval.py, tests/test_eval_offline.py
 
 ## Acceptance
 - [ ] `eval --offline` 17/17 and part of pytest
-- [ ] Live `eval` ≥ 16/17 within $5; the scorecard is saved to docs/scorecard.md
+- [ ] The offline scorecard is saved to docs/scorecard.md (live eval is ticket 19)
 
 ## Verify
 ```bash

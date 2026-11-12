@@ -5,10 +5,10 @@
 - **Status:** todo
 
 ## What
-The agent produces a typed `Invoice` from a `RawDocument`. The prompt treats document text as untrusted data. SKU canonicalisation (`Widget A`, `WidgetA (rush order)` → `WidgetA`, raw text kept). Date normalisation, with unparseable dates becoming None plus a finding (never a guess). OCR digit repair (`O`→`0`) only inside numeric tokens. An `output_validator` reconciles qty×price, the line sum, subtotal+tax+shipping and the total; on a mismatch it raises `ModelRetry` with the specific numbers, at most 2 retries, after which the result is accepted with an `ARITHMETIC_MISMATCH` finding. Per-field provenance is `parsed`, `llm` or `missing`. Record the fixtures for all 22 files with `eval --record`.
+The agent produces a typed `Invoice` from a `RawDocument`. The prompt treats document text as untrusted data. SKU canonicalisation (`Widget A`, `WidgetA (rush order)` → `WidgetA`, raw text kept). Date normalisation, with unparseable dates becoming None plus a finding (never a guess). OCR digit repair (`O`→`0`) only inside numeric tokens. An `output_validator` reconciles qty×price, the line sum, subtotal+tax+shipping and the total; on a mismatch it raises `ModelRetry` with the specific numbers, at most 2 retries, after which the result is accepted with an `ARITHMETIC_MISMATCH` finding. Per-field provenance is `parsed`, `llm` or `missing`. Write hand-made golden `Invoice` JSON for all 22 files; the offline model replays them. Live recording is ticket 19.
 
 ## Surfaces
-invoice_agents/agents/extractor.py, invoice_agents/normalize.py, tests/test_extraction.py, tests/fixtures/llm/*.json
+invoice_agents/agents/extractor.py, invoice_agents/normalize.py, tests/test_extraction.py, tests/fixtures/golden/*.json
 
 ## Acceptance
 - [ ] Offline extraction of all 22 files matches the golden `Invoice` JSON

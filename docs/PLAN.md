@@ -2,6 +2,8 @@
 
 **Goal:** a reviewer clones the repo, runs one setup command, and watches 17 messy invoices move through extraction, validation, approval and payment. Every outcome matches an expected-outcome scorecard, and every decision can be traced to a rule or an agent's reasoning.
 
+**AFK queue:** [afk/QUEUE.md](afk/QUEUE.md) holds the enriched tickets, waves and human-readiness items.
+
 **Current state (2026-11-12):** the repo holds only the brief (`README.md`), 22 sample files in `data/invoices/`, `data/generate_pdfs.py`, and three docs: [PRD.md](PRD.md) (requirements), [DECISIONS.md](DECISIONS.md) (D1–D25, locked by David) and `prd.html` (the page behind the PRD Artifact). There is no code yet.
 
 **Workflow state:**
@@ -40,9 +42,9 @@
 ## Assumptions (agent choices; change without reopening the design)
 
 - **A1:** the package is `invoice_agents/`, and `main.py` at the repo root is a thin Typer entry point that keeps the brief's `python main.py --invoice_path=…` working.
-- **A2:** the default stand-in model is `anthropic:claude-sonnet-5-5`, set by `INVOICE_MODEL` or `--model`. Sonnet over Opus for cost; the eval scorecard decides whether to move up.
+- **A2:** the default stand-in model is `anthropic:claude-haiku-5-5` (David, 2026-11-12), set by `INVOICE_MODEL` or `--model`.
 - **A3:** a human decision does not resume a paused graph run. It runs a short graph from the stored decision state (approved → pay; rejected → log).
-- **A4:** `--offline` uses recorded LLM responses (`tests/fixtures/llm/<sha256-of-input>.json`), replayed by a `FunctionModel`, and recorded by `main.py eval --record` against a live model. A missing recording fails loudly; it is never guessed.
+- **A4:** `--offline` replays hand-written golden outputs (`tests/fixtures/golden/`) through a `FunctionModel`, keyed by sha256 of the input. A missing golden fails loudly; it is never guessed. David ruled no live calls unattended (2026-11-12), so live recording and comparison is HITL ticket 19.
 - **A5:** rules have stable IDs (for example `STOCK_EXCEEDED`, `PRICE_OVER_CATALOG`) and a severity of `hard`, `soft`, `fraud` or `note`. The agents cite these IDs, and the eval asserts on them.
 - **A6:** the mock rate table holds `EUR→USD 1.08` dated 2026-01-31, labelled as mock data.
 - **A8:** in the fixed eval order, 1004 is auto-paid before R1 arrives. So per D2, R1's expected outcome is a `superseded` event plus the +$4,050 delta escalated, not a second full payment. `expected_outcomes.yaml` encodes this, which changes PRD §5's draft row.
@@ -104,7 +106,7 @@ The tickets live in [tickets/](tickets/). Their blocking edges:
                 ├─► 07 ───────┤                      ├─► 16
                 └─► 08 ───────┘                      │
        09 ─► 13 ─► 14        05 ─► 15                └─► 17 (also needs 13, 14, 15, 16)
-       18 (blocked on xAI key; after 05 and 07)
+       19 (HITL: credits; after 09, 14, 15) ─► 18 (HITL: xAI key)
 ```
 
 **Cut line (D22):** 01–09 is the minimum shippable system. 10–11 complete the ledger and inbox story, 12 is the UI, 13–16 are extras, and 17 is presentation.
@@ -119,7 +121,7 @@ The tickets live in [tickets/](tickets/). Their blocking edges:
 | Human-in-the-loop path completes | 11 | Test: escalate 1012, `review --approve`, then a `paid` event | not started |
 | The LLM can't override hard rules | 07, 14 | Prompt-injection invoice is never `paid` | not started |
 | UI usable | 12 | Streamlit smoke test plus a screenshot | not started |
-| Live model parity | 09 | `main.py eval` (live) ≥ 16/17; a miss is logged in STATUS | not started |
+| Live model parity | 19 (HITL) | `main.py eval` (live) ≥ 16/17; a miss is logged in STATUS | not started |
 
 ## Quality gates
 
