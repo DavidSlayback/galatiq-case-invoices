@@ -6,8 +6,8 @@
 |---|---|---|---|---|
 | 01 | [scaffold](tickets/01-scaffold.md) | 0 | serial | done (#1) |
 | 02 | [domain-and-db](tickets/02-domain-and-db.md) | 1 | serial | done (#2) |
-| 03 | [tracer-bullet](tickets/03-tracer-bullet.md) | 2 | serial | done |
-| 04 | [loaders](tickets/04-loaders.md) | 3 | loaders | todo |
+| 03 | [tracer-bullet](tickets/03-tracer-bullet.md) | 2 | serial | done (#4) |
+| 04 | [loaders](tickets/04-loaders.md) | 3 | loaders | verifying |
 | 05 | [extraction-agent](tickets/05-extraction-agent.md) | 4 | serial | todo |
 | 06 | [rules](tickets/06-rules.md) | 3 | rules | todo |
 | 07 | [approval](tickets/07-approval.md) | 3 | approval | todo |

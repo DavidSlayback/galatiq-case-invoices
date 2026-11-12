@@ -7,7 +7,7 @@ import hashlib
 from collections.abc import Callable
 from pathlib import Path
 
-from invoice_agents.loaders import json_loader
+from invoice_agents.loaders import json_loader, text_loaders
 from invoice_agents.models import RawDocument
 
 
@@ -17,7 +17,14 @@ class LoadError(Exception):
 
 Loader = Callable[[Path, bytes, str], RawDocument]
 
-_LOADERS: dict[str, Loader] = {".json": json_loader.load}
+_LOADERS: dict[str, Loader] = {
+    ".json": json_loader.load,
+    ".txt": text_loaders.load_txt,
+    ".eml": text_loaders.load_txt,
+    ".csv": text_loaders.load_csv,
+    ".xml": text_loaders.load_xml,
+    ".pdf": text_loaders.load_pdf,
+}
 
 
 def file_sha256(data: bytes) -> str:
