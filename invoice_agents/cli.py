@@ -7,6 +7,7 @@ from typing import Annotated
 import typer
 from rich.console import Console
 
+from invoice_agents import eval as eval_mod
 from invoice_agents import graph
 from invoice_agents import settings as settings_mod
 from invoice_agents.agents.offline import MissingFixture
@@ -81,9 +82,22 @@ def process(
 
 
 @app.command("eval")
-def eval_cmd(offline: OfflineOpt = False, model: ModelOpt = None) -> None:
-    """Score every sample invoice against eval/expected_outcomes.yaml."""
-    _not_yet()
+def eval_cmd(
+    offline: OfflineOpt = False,
+    model: ModelOpt = None,
+    scorecard: Annotated[Path | None, typer.Option(help="Write the Markdown scorecard here.")] = Path(
+        "docs/scorecard.md"
+    ),
+) -> None:
+    """Score every sample invoice against eval/expected_outcomes.yaml (fresh database, fixed order)."""
+    s = build_settings(model, offline, None, None)
+    rows = eval_mod.run(s)
+    console.print(eval_mod.table(rows))
+    if scorecard:
+        scorecard.write_text(eval_mod.markdown(rows, s.model or "offline"), encoding="utf-8")
+    bad = eval_mod.failures(rows)
+    console.print(f"{sum(r.passed for r in rows)}/{len(rows)} pass, {len(bad)} failing.")
+    raise typer.Exit(1 if bad else 0)
 
 
 @app.command()
