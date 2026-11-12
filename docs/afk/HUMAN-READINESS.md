@@ -1,29 +1,27 @@
 # Human readiness
 
-These are every foreseeable human action or decision. None of them block the AFK queue (01–17).
+No human action blocks any ticket.
 
-## Action items
+## Optional action
 
-**H1: get an xAI API key.** Unblocks ticket 18.
-- Steps: create a key in the xAI console, then add `export XAI_API_KEY=...` to `~/user-env.sh`.
-- Done when: `grep -c XAI_API_KEY ~/user-env.sh` prints 1.
-- Fallback until then: Claude Haiku stays the default and the README says Grok is a config switch.
-
-**H2: install Tesseract** (optional). Unblocks the Tesseract path in ticket 15; its tests skip without it.
+**H2: install Tesseract.** Enables the local-OCR path in ticket 15; its tests skip without it.
 - Run: `sudo apt install tesseract-ocr`
 - Done when: `tesseract --version` prints a version.
 - Fallback until then: scanned PDFs go straight to the vision model.
 
-**H3: sort out API credits and a live-spend cap.** Unblocks ticket 19, then 18.
-- Confirm which Anthropic account and key hold the credits, and put that key in `ANTHROPIC_API_KEY`.
-- Give a cap, for example "$5 per run, $30 total". On 2026-11-12 the current key answered a free models-list call with HTTP 200, but whether it has credit was not checked, by David's choice.
-- Done when: David says "live pass approved, cap $X".
-- Fallback until then: everything is verified offline against the goldens, and the README marks live results as pending.
+## Standing conditions (no action needed)
+
+- `cursor-agent` and `claude` stay logged in. On 2026-11-12 both answered a headless test call.
+- If either CLI reports a quota or rate limit, the loop stops and reports what remains (ticket 17's stop condition). The fix is to wait for the quota to reset, or to say "switch the live pass to `cli:claude:haiku`".
 
 ## Decisions already taken (2026-11-12)
 
 | Decision | Answer |
 |---|---|
-| Stand-in model | Claude Haiku |
-| Live calls unattended | No; collected into HITL ticket 19 |
+| API credits | None bought; use the Cursor Pro and Claude Max subscriptions (D31) |
+| Live default | Grok 4.7 via Cursor, with Claude Haiku via Max as the cross-check |
+| Unattended live calls | Allowed, about 100–200 calls |
+| Default with nothing configured | Auto-detect, with offline replay last (D32) |
 | Demo video | Synthetic, made by the agent |
+
+H1 (an xAI key) and H3 (credits) are retired. The xAI API path is still selectable by config for anyone who has a key.

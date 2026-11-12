@@ -26,7 +26,7 @@
 - No internet at runtime except the configured LLM endpoint. `--offline` runs with no network at all.
 - Python, managed with uv. Hard rules live in code, not prompts. Invoice text is untrusted input.
 - No GitHub Actions; the local pre-commit and test suite is the gate.
-- The xAI key is not available yet; Claude stands in for Grok (D12).
+- No API credits. Live models run through the Cursor CLI (Grok) and Claude Code (Max) via a sandboxed bridge (D31, D32).
 
 ## Facts checked 2026-11-12
 
@@ -37,12 +37,12 @@
 | pydantic-graph 2.x has **no** `persistence` module (the 1.x snapshot persistence is gone) | Import error; the module listing has no persistence file | D11's "persistence for audit" rationale no longer holds. The audit trail is the D25 event ledger, and resuming after a human decision reads our own SQLite state (assumption A3). |
 | PydanticAI exports `Agent(output_type=…, retries=…)`, `output_validator`, `ModelRetry`, `FunctionModel`, `TestModel`, `BinaryContent`, `AnthropicModel` | Import and signature introspection | Typed extraction, validator-driven retries, scripted offline models and vision input are all available. |
 | No `tesseract` binary on this machine | `command -v tesseract` is empty | The OCR stage (ticket 15) needs David to run `sudo apt install tesseract-ocr`. Until then the chain skips to the vision model. |
-| Keys present: `ANTHROPIC_API_KEY`, `OPENROUTER_API_KEY` and others; no `XAI_API_KEY` | `~/user-env.sh` (names only) | The Claude stand-in works now. Ticket 18 waits on the xAI key. |
+| Keys present: `ANTHROPIC_API_KEY`, `OPENROUTER_API_KEY` and others; no `XAI_API_KEY` | `~/user-env.sh` (names only) | The Claude stand-in works now. Live calls use the subscription CLIs (D31). |
 
 ## Assumptions (agent choices; change without reopening the design)
 
 - **A1:** the package is `invoice_agents/`, and `main.py` at the repo root is a thin Typer entry point that keeps the brief's `python main.py --invoice_path=…` working.
-- **A2:** the default stand-in model is `anthropic:claude-haiku-5-5` (David, 2026-11-12), set by `INVOICE_MODEL` or `--model`.
+- **A2:** the model is set by `INVOICE_MODEL` or `--model`; with neither, D32 auto-detect picks one. The live default is `cli:cursor:grok-4.7-medium-fast`, with `cli:claude:haiku` as the cross-check (D31).
 - **A3:** a human decision does not resume a paused graph run. It runs a short graph from the stored decision state (approved → pay; rejected → log).
 - **A4:** `--offline` replays hand-written golden outputs (`tests/fixtures/golden/`) through a `FunctionModel`, keyed by the input file's sha256. A missing golden fails loudly; it is never guessed. David ruled no live calls unattended (2026-11-12), so live recording and comparison is HITL ticket 19.
 - **A5:** rules have stable IDs (for example `STOCK_EXCEEDED`, `PRICE_OVER_CATALOG`) and a severity of `hard`, `soft`, `fraud` or `note`. The agents cite these IDs, and the eval asserts on them.
@@ -52,7 +52,7 @@
 
 ## Open decisions
 
-None that block the work. Ticket 18 (switching to Grok) waits only on the key.
+None that block the work. None.
 
 ## Approach
 
@@ -106,10 +106,10 @@ The tickets live in [tickets/](tickets/). Their blocking edges:
                 ├─► 07 ───────┤                      ├─► 16
                 └─► 08 ───────┘                      │
        09 ─► 13 ─► 14        05 ─► 15                └─► 17 (also needs 13, 14, 15, 16)
-       19 (HITL: credits; after 09, 14, 15) ─► 18 (HITL: xAI key)
+       05, 07 ─► 17 (CLI bridge) ─► 18 (live pass, also after 09, 14, 15) ─► 19 (presentation, also after 12–16)
 ```
 
-**Cut line (D22):** 01–09 is the minimum shippable system. 10–11 complete the ledger and inbox story, 12 is the UI, 13–16 are extras, and 17 is presentation.
+**Cut line (D22):** 01–09 is the minimum shippable system. 10–11 complete the ledger and inbox story, 12 is the UI, 13–16 are extras, and 17 is the model bridge, 18 the live pass and 19 the presentation.
 
 ## Acceptance evidence ledger
 
@@ -121,7 +121,7 @@ The tickets live in [tickets/](tickets/). Their blocking edges:
 | Human-in-the-loop path completes | 11 | Test: escalate 1012, `review --approve`, then a `paid` event | not started |
 | The LLM can't override hard rules | 07, 14 | Prompt-injection invoice is never `paid` | not started |
 | UI usable | 12 | Streamlit smoke test plus a screenshot | not started |
-| Live model parity | 19 (HITL) | `main.py eval` (live) ≥ 16/17; a miss is logged in STATUS | not started |
+| Live model parity | 18 | `main.py eval` (live) ≥ 16/17; a miss is logged in STATUS | not started |
 
 ## Quality gates
 

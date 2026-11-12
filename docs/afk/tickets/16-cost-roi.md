@@ -10,7 +10,7 @@
 
 ## Context
 - Why: D21, NFR-11; translates the system into the $2M / 5-day / 30% story.
-- Constraining decisions: D21: editable assumptions; no invented volume. The price table lives in settings, read from the claude-api skill's pricing reference at implementation time, with its date. Offline runs show $0 measured and label the figures 'offline: no model cost'; real numbers arrive with ticket 19.
+- Constraining decisions: D21: editable assumptions; no invented volume. The price table lives in settings, read from the claude-api skill's pricing reference at implementation time, with its date. Offline runs show $0 measured and label the figures 'offline: no model cost'; real token and time numbers arrive with ticket 18 and are shown as API-equivalent cost at published prices (the subscription CLIs bill no per-call dollars).
 - Failure paths: A missing price for a model → cost shown as 'unknown', never 0.
 - Plan anchors: PRD NFR-11; D21
 
@@ -28,7 +28,7 @@
 - Conflict risk: low
 
 ## Out of scope
-- Live cost measurement (ticket 19)
+- Live cost measurement (ticket 18)
 
 ## Completion evidence
 - ROI page screenshot

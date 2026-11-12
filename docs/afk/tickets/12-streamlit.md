@@ -10,7 +10,7 @@
 
 ## Context
 - Why: D18 and the brief's UI/UX criterion.
-- Constraining decisions: D18: Streamlit was chosen over Textual and FastAPI+HTMX because it is pure Python and easy for graders to click. Offline is the default in the UI until ticket 19 confirms the live path. Screenshots are taken headless with the pre-installed Playwright/Chromium.
+- Constraining decisions: D18: Streamlit was chosen over Textual and FastAPI+HTMX because it is pure Python and easy for graders to click. Offline is the default in the UI and live backends follow D32 auto-detect once ticket 17 lands. Screenshots are taken headless with the pre-installed Playwright/Chromium.
 - Failure paths: An upload of an unsupported type → an inline error. A DB locked by the CLI → WAL handles it, with retry and a toast.
 - Plan anchors: PRD FR-5.6; D18
 

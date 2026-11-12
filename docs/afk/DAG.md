@@ -1,6 +1,6 @@
 # Dependency graph
 
-An edge `A → B` means B can't start until A is verified. The graph is acyclic (checked: every edge points from a lower ticket number to a higher one, except 19 → 18, and 18 has no outgoing edges).
+An edge `A → B` means B can't start until A is verified. The graph is acyclic (checked: every edge points from a lower ticket number to a higher one, with no exceptions).
 
 ```mermaid
 graph TD
@@ -16,17 +16,18 @@ graph TD
   05 --> 15
   09 --> 10 --> 11 --> 12 --> 16
   09 --> 13 --> 14
-  12 --> 17
-  13 --> 17
-  14 --> 17
-  15 --> 17
-  16 --> 17
-  09 --> 19
+  05 --> 17
+  07 --> 17
+  09 --> 18
+  14 --> 18
+  15 --> 18
+  17 --> 18
+  12 --> 19
+  13 --> 19
   14 --> 19
   15 --> 19
-  19 --> 18
-  H3((H3 credits)) -.-> 19
-  H1((H1 xAI key)) -.-> 18
+  16 --> 19
+  18 --> 19
 ```
 
 | Edge | Reason |
@@ -44,9 +45,8 @@ graph TD
 | 12→16 | architecture: the ROI page lives in the Streamlit app |
 | 09→13 | the risk score changes expected outcomes, and the eval guards it |
 | 13→14 | hard contract: the adversarial files need the lookalike and risk rules |
-| 12, 13, 14, 15, 16→17 | data: the presentation shows screenshots, the risk story, adversarial results, the OCR story and the ROI |
-| 09, 14, 15→19 | the live pass covers the offline eval, the adversarial rows and the vision path |
-| 19→18 | environment: the live harness and its budget are proven on Haiku before switching providers |
-| H3⇢19, H1⇢18 | human action (see HUMAN-READINESS) |
+| 05, 07→17 | hard contract: the bridge plugs into the extractor, VP and critic agents |
+| 09, 14, 15, 17→18 | the live pass runs the eval (incl. adversarial rows and the vision path) through the bridge |
+| 12, 13, 14, 15, 16, 18→19 | data: the presentation shows screenshots, the risk story, adversarial results, the OCR story, the ROI and the live scorecard |
 
 No edges were added for merge conflicts. The conflict on `eval/expected_outcomes.yaml` between 10 and 13 is handled by integration order (WAVES.md), not by a blocking edge, because their behaviour is independent.

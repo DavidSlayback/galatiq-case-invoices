@@ -30,7 +30,7 @@
 - Conflict risk: medium: expected_outcomes.yaml is later edited by 10 and 14
 
 ## Out of scope
-- Live eval (ticket 19)
+- Live eval (ticket 18)
 - Adversarial files (ticket 14)
 
 ## Completion evidence

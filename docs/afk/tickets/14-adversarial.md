@@ -16,7 +16,7 @@
 
 ## Acceptance criteria
 - [ ] No adversarial file reaches `paid` except the control
-- [ ] The injection file is never `paid` and carries a fraud finding (offline). Field-level injection resistance against a real model is checked in ticket 19.
+- [ ] The injection file is never `paid` and carries a fraud finding (offline). Field-level injection resistance against a real model is checked in ticket 18.
 - [ ] `eval --offline` passes on originals plus adversarial files
 
 ## Verification

@@ -27,7 +27,7 @@
 | FR-5.3–5.4 CLI and structured logs | 01, 03 |
 | FR-5.5 batch | 10 |
 | FR-5.6 UI | 12, 16 |
-| FR-5.7 Grok | 18 (HITL) |
+| FR-5.7 Grok | 17, 18 |
 | NFR-1 offline | 03 (`--offline`), 05 |
 | NFR-2/3 Python, local | 01 |
 | NFR-4 testable, quality | 01 (gate), all |
@@ -36,10 +36,10 @@
 | NFR-7 safe by default | 07, 08 |
 | NFR-8 untrusted input | 05 (prompt), 14 |
 | NFR-9 tracing | 03 (JSONL), 16 |
-| NFR-10 one-command setup | 01, 17 |
-| NFR-11 cost and time | 16, 19 |
+| NFR-10 one-command setup | 01, 19 |
+| NFR-11 cost and time | 16, 18 |
 | NFR-12 GitHub repository | done (repo exists) |
-| D1 literal stock with caveat | 06, 17 (README) |
+| D1 literal stock with caveat | 06, 19 (README) |
 | D2 and D25 ledger and events | 02, 10 |
 | D3 no stock consumption | 06 |
 | D4 no partial payment | 08 |
@@ -50,7 +50,7 @@
 | D9 vendor seed | 02, 13 |
 | D10 fraud escalates | 07, 13, 14 |
 | D11 PydanticAI + pydantic-graph | 03 |
-| D12 model config, Claude → Grok | 01, 18 |
+| D12 model config (amended) | 01, 17 |
 | D13 parsers then LLM | 04, 05 |
 | D14 2 retries then finding | 05 |
 | D15 VP + critic | 07 |
@@ -62,7 +62,7 @@
 | D21 editable ROI assumptions | 16 |
 | D22 build order | WAVES.md |
 | D23 tooling | 01 |
-| D24 presentation | 17 |
+| D24 presentation | 19 |
 | D25a extended event types | 02 |
 | D26 terms tolerance | 06 |
 | D27 boundaries, UNKNOWN_VENDOR severity | 06, 07 |
@@ -71,12 +71,14 @@
 | D30 1007 arithmetic | 05, 06, 09 |
 | A2 Haiku | 01 |
 | A3 resume from SQLite | 11 |
-| A4 goldens offline, live recording later | 03, 05, 19 |
+| A4 goldens offline, live recording later | 03, 05, 18 |
 | A5 rule IDs and severities | 02, 06 |
 | A6 FX rate | 02 |
 | A7 payment hook | 08 |
 | A8 1004 R1 delta | 09 (pending), 10 |
-| Live model parity | 19 (HITL) |
+| Live model parity | 18 |
+| D31 subscription CLI backends | 17, 18 |
+| D32 backend auto-detect | 17, 19 (README) |
 
 ## Ticket → plan anchor
 
@@ -98,8 +100,8 @@
 | 14 | NFR-8, D10, D20 |
 | 15 | D16 |
 | 16 | NFR-11, D21 |
-| 17 | D24, D1 caveat |
-| 18 | D12, FR-5.7 |
-| 19 | A4, live parity, NFR-11 |
+| 17 | D12, D31, D32, NFR-8 |
+| 18 | A4, D31, live parity, NFR-11, FR-5.7 |
+| 19 | D24, D1 caveat, D32 |
 
 **Unmapped:** none in either direction.

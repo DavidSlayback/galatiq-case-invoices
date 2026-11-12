@@ -1,8 +1,8 @@
-# 17 — README, Artifact presentation and synthetic demo video
+# 19 — README, Artifact presentation and synthetic demo video
 
-**Source:** [17-presentation.md](../../tickets/17-presentation.md)
+**Source:** [17-presentation.md](../../tickets/19-presentation.md)
 **Type:** AFK
-**Blocked by:** 12 (screenshots); 13 (risk content); 14 (adversarial results); 15 (OCR story); 16 (ROI)
+**Blocked by:** 12 (screenshots); 13 (risk content); 14 (adversarial results); 15 (OCR story); 16 (ROI); 18 (live Grok scorecard)
 **Wave:** 10
 **Lane:** serial-required
 **Verifier profile:** self-check
@@ -10,7 +10,7 @@
 
 ## Context
 - Why: D24; the brief's presentation criterion.
-- Constraining decisions: D24: README plus Artifact (in place of slides) plus video. The video is synthetic (David, 2026-11-12): use the record-demo-video skill's synthetic mode with a local Kokoro voice, recording real offline CLI and Streamlit runs. The README states that live-model results are pending until ticket 19 if it hasn't run. No AI-disclosure boilerplate.
+- Constraining decisions: D24: README plus Artifact (in place of slides) plus video. The video is synthetic (David, 2026-11-12): use the record-demo-video skill's synthetic mode with a local Kokoro voice, recording real offline CLI and Streamlit runs. The README shows the offline scorecard and the live Grok scorecard from ticket 18, and explains the four model backends (D32). No AI-disclosure boilerplate.
 - Failure paths: A fresh clone without an API key must still reach the scorecard through --offline.
 - Plan anchors: PRD §1; D24
 
@@ -28,7 +28,7 @@
 - Conflict risk: low
 
 ## Out of scope
-- Live numbers if ticket 19 hasn't run
+- Re-running live evals
 
 ## Completion evidence
 - Fresh-clone transcript

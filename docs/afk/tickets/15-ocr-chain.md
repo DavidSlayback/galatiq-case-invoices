@@ -10,7 +10,7 @@
 
 ## Context
 - Why: D16 ('3 then 1': local first, model last).
-- Constraining decisions: D16. Tesseract is not installed (verified 2026-11-12); this ticket must work and be tested without it. Tesseract-path tests are `skipif(no binary)`, and the vision path is tested offline with a scripted FunctionModel that asserts it received an image part. Live vision verification is ticket 19.
+- Constraining decisions: D16. Tesseract is not installed (verified 2026-11-12); this ticket must work and be tested without it. Tesseract-path tests are `skipif(no binary)`, and the vision path is tested offline with a scripted FunctionModel that asserts it received an image part. Live vision verification is ticket 18.
 - Failure paths: No binary → a `ocr_skipped` trace line, then vision. An empty OCR result or mean confidence < 60 → vision. Vision unavailable offline with no golden → LOAD_FAILED, never a crash.
 - Plan anchors: PRD FR-1.2; D16
 
@@ -30,7 +30,7 @@
 
 ## Out of scope
 - Installing Tesseract (human action H2)
-- Live vision quality (ticket 19)
+- Live vision quality (ticket 18)
 
 ## Completion evidence
 - Test output showing which path ran

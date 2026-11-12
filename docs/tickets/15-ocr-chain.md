@@ -11,7 +11,7 @@ If the PDF has no text layer: render with pypdfium2, run Tesseract if the binary
 invoice_agents/loaders/pdf_loader.py, data/invoices/adversarial/invoice_1011_scan.pdf, tests/test_ocr.py
 
 ## Acceptance
-- [ ] Offline: the scripted vision model receives an image part for the scanned 1011 (live check is ticket 19)
+- [ ] Offline: the scripted vision model receives an image part for the scanned 1011 (live check is ticket 18)
 - [ ] With no tesseract binary, the chain logs a skip and uses vision
 
 ## Verify

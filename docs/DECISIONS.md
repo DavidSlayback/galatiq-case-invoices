@@ -22,7 +22,7 @@ Decisions from the grilling session on 2026-11-12. Each one comes from David unl
 | # | Decision | Why / consequence |
 |---|---|---|
 | D11 (B-8) | Agents use PydanticAI; the workflow graph uses pydantic-graph. | Typed structured outputs and tools, a Mermaid diagram for free, and persistence for the audit trail. One dependency family. |
-| D12 (B-12) | The model is set in config. Use Claude through the Anthropic key until David supplies an xAI key, then switch to Grok. A scripted PydanticAI `FunctionModel` runs tests and the `--offline` demo. | The brief prefers Grok, and there is no key yet. Tests need no network. |
+| D12 (B-12) | The model is set in config. *Amended by D31 and D32:* live runs use Grok via the Cursor CLI, with Claude via Claude Code as a cross-check; there are no API credits. A scripted PydanticAI `FunctionModel` runs tests and the `--offline` demo. | The brief prefers Grok, and there is no key yet. Tests need no network. |
 | D13 (B-10) | Format loaders (json, csv, xml, pdf text) run first. The LLM extraction agent always produces the typed `Invoice`, and deterministic checks reconcile the totals. | Agentic, yet anchored by the parsers. |
 | D14 (B-11) | Extraction self-correction: feed the specific mismatch back, at most 2 retries, then keep the result with an "arithmetic mismatch" finding, which validation rejects. | The LLM must not invent consistency (1009's mismatch is real). |
 | D15 (B-9, B-11) | In the VP tier, a VP agent proposes approve or reject, citing rule IDs. A separate critic agent checks it. If they still disagree after 2 rounds, a human decides. A code guardrail makes approval impossible when any hard rule failed. | The LLM has real but bounded authority (FR-3.6). |
@@ -57,6 +57,13 @@ Decisions from the grilling session on 2026-11-12. Each one comes from David unl
 | D28 | Fixed VP-tier outcomes for the eval: 1001 approve, 1010 approve, 1012 VP approve then critic objects twice → inbox. | Stops the eval from being circular; gives the inbox a natural sample. |
 | D29 | Payments go out in the invoice currency (1014: EUR 4,125.00) with the USD equivalent recorded (4,455.00); tiers and price rules use USD. | The mock_payment signature has no currency field. |
 | D30 | INV-1007 also has a stated-total error (14,750 + 885 = 15,635, not 15,525); its expected outcome requires ARITHMETIC_MISMATCH. | The PRD missed it; a fresh-context review found it. |
+
+## Model backends (David, 2026-11-12)
+
+| # | Decision | Why / consequence |
+|---|---|---|
+| D31 | No API credits are bought. Live calls go through David's subscriptions: Grok 4.7 via `cursor-agent -p` (Cursor Pro) is the default, and Claude Haiku via `claude -p` (Claude Max) is the cross-check. Both are wrapped as a PydanticAI `FunctionModel` bridge, sandboxed in an empty temp dir with tools off or read-only. Unattended live runs are allowed (about 100–200 calls). | Uses the plans David already pays for and honours "use Grok". Invoices are untrusted, so the agent CLIs must not have tools that act. |
+| D32 | When no model is configured, pick one automatically: `XAI_API_KEY` → xAI API; another API key → that API; a logged-in `cursor-agent` or `claude` → the CLI bridge; otherwise `--offline` replay with a banner. | Graders without David's logins can always run it. |
 
 ## Agent choices (not decided by David; flag if wrong)
 
