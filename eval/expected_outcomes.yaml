@@ -27,7 +27,6 @@ data/invoices/invoice_1004.json:
 
 data/invoices/invoice_1004_revised.json:
   status: escalated
-  pending: ledger
   why: R1 arrives after 1004 was paid; it supersedes it and only the +$4,050 delta goes to the inbox (D2, A8).
 
 data/invoices/invoice_1005.json:
@@ -69,7 +68,6 @@ data/invoices/invoice_1011.pdf:
 
 data/invoices/invoice_1011.txt:
   status: duplicate_skipped
-  pending: ledger
   why: Same invoice as the PDF; never paid twice (D2).
 
 data/invoices/invoice_1012.pdf:
@@ -79,7 +77,6 @@ data/invoices/invoice_1012.pdf:
 
 data/invoices/invoice_1012.txt:
   status: duplicate_skipped
-  pending: ledger
   why: Same invoice as the PDF copy.
 
 data/invoices/invoice_1013.json:
@@ -89,7 +86,6 @@ data/invoices/invoice_1013.json:
 
 data/invoices/invoice_1013.pdf:
   status: duplicate_skipped
-  pending: ledger
   why: Same invoice as the JSON copy.
 
 data/invoices/invoice_1014.xml:
@@ -111,5 +107,4 @@ data/invoices/invoice_1016.json:
 
 data/invoices/scans/invoice_1011_scan.pdf:
   status: duplicate_skipped
-  pending: ledger
   why: Image-only copy of 1011, read through OCR or the vision model (D16); same invoice as the PDF, so it is never paid twice.

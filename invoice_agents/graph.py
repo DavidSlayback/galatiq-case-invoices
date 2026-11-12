@@ -6,15 +6,17 @@ the stage modules (rules, approval, payment), not here.
 """
 
 import asyncio
+import json
 import sqlite3
 from dataclasses import dataclass, field
+from decimal import Decimal
 from pathlib import Path
 
 from pydantic_ai.exceptions import UnexpectedModelBehavior
 from pydantic_ai.messages import ModelMessage
 from pydantic_graph import GraphBuilder, StepContext
 
-from invoice_agents import approval, db, fx, payment, reconcile, rules
+from invoice_agents import approval, db, fx, ledger, payment, reconcile, rules
 from invoice_agents.agents import extractor, reviewers
 from invoice_agents.approval import Approve, AutoApprove, HumanReview, Objected, Proposed, Reject, VpReview
 from invoice_agents.ledger import key_for
@@ -60,6 +62,8 @@ class State:
     findings: list[Finding] = field(default_factory=list[Finding])
     model_name: str = ""
     review_brief: str = ""
+    mismatches: list[str] = field(default_factory=list[str])
+    amount_due: Decimal | None = None  # set when a revision arrives after the original was paid
     vp_history: list[ModelMessage] = field(default_factory=list[ModelMessage])
 
 
@@ -82,6 +86,14 @@ class Extracted:
     """The extractor's answer for this attempt."""
 
     invoice: Invoice
+
+
+@dataclass(frozen=True)
+class DuplicateFound:
+    """The ledger already holds this invoice (same or newer revision)."""
+
+    invoice: Invoice
+    why: dict[str, object]
 
 
 @dataclass(frozen=True)
@@ -162,19 +174,74 @@ async def reconcile_step(ctx: StepContext[State, Deps, Extracted]) -> Reconciled
             )
         )
     assert s.doc is not None
-    s.invoice, s.key = inv, key_for(inv, s.doc.file_sha256)
-    d = ctx.deps
+    s.invoice, s.key, s.mismatches = inv, key_for(inv, s.doc.file_sha256), problems
+    return Reconciled(inv)
+
+
+@g.step
+async def ledger_check(ctx: StepContext[State, Deps, Reconciled]) -> Reconciled | DuplicateFound:
+    """Skip duplicates, supersede earlier revisions, and record receipt (D2, D25)."""
+    s, d, inv = ctx.state, ctx.deps, ctx.inputs.invoice
+    assert s.doc is not None and s.key is not None
+    found = ledger.check(d.conn, s.key, inv)
+    d.tracer.log("ledger", result=type(found).__name__)
+    received = {"path": s.doc.path, "sha256": s.doc.file_sha256, "format": s.doc.format}
+    if isinstance(found, ledger.Duplicate | ledger.Stale):
+        # The ledger row belongs to the copy already on file; events only, no status change.
+        db.record(d.conn, s.key, EventType.RECEIVED, actor="intake", run_id=s.run_id, payload=received)
+        why: dict[str, object] = (
+            {"duplicate_of": found.original_path, "original_status": found.original_status}
+            if isinstance(found, ledger.Duplicate)
+            else {"stale_revision": inv.revision, "current_revision": found.current_revision}
+        )
+        db.record(d.conn, s.key, EventType.DUPLICATE_SKIPPED, actor="ledger", run_id=s.run_id, payload=why)
+        if isinstance(found, ledger.Stale):
+            msg = f"revision {inv.revision} is older than revision {found.current_revision} on file"
+            s.findings.append(Finding(rule_id="STALE_REVISION", severity="soft", message=msg))
+        return DuplicateFound(inv, why)
+    if isinstance(found, ledger.Conflict):
+        # Keep the original's row intact: the conflicting copy gets its own ledger key.
+        s.key = s.key._replace(invoice_number=f"{s.key.invoice_number} (conflict {s.doc.file_sha256[:8]})")
+        msg = f"same invoice number and revision as one on file, but {', '.join(found.fields)} differ"
+        s.findings.append(Finding(rule_id="DUPLICATE_NUMBER_CONFLICT", severity="fraud", message=msg,
+                                  evidence={"fields": found.fields}))  # fmt: skip
     db.record(
-        d.conn, s.key, EventType.RECEIVED, actor="intake", run_id=s.run_id,
-        payload={"path": s.doc.path, "sha256": s.doc.file_sha256, "format": s.doc.format},
+        d.conn, s.key, EventType.RECEIVED, actor="intake", run_id=s.run_id, payload=received,
         status=Status.RECEIVED, source_path=s.doc.path, total=inv.total, currency=inv.currency,
+        core=json.dumps(ledger.core(inv)),
     )  # fmt: skip
+    if isinstance(found, ledger.Revision):
+        with d.conn:
+            d.conn.executemany(
+                "UPDATE inbox SET status='withdrawn', resolved_ts=?, note=? WHERE id=?",
+                [(db.now(), f"superseded by revision {inv.revision}", i) for i in found.open_inbox_ids],
+            )
+        if found.open_inbox_ids:
+            db.record(d.conn, s.key, EventType.WITHDRAWN, actor="ledger", run_id=s.run_id,
+                      payload={"inbox_ids": found.open_inbox_ids, "reason": "superseded"})  # fmt: skip
+        db.record(
+            d.conn, s.key, EventType.SUPERSEDED, actor="ledger", run_id=s.run_id,
+            payload={"previous_revision": found.previous_revision, "revision": inv.revision,
+                     "already_paid": str(found.already_paid), **found.changes},
+        )  # fmt: skip
+        if found.already_paid > 0 and inv.total is not None:
+            s.amount_due = inv.total - found.already_paid
     db.record(
         d.conn, s.key, EventType.EXTRACTED, actor="extractor", run_id=s.run_id,
-        payload={"model": s.model_name, "attempts": s.attempt + 1, "mismatches": problems},
+        payload={"model": s.model_name, "attempts": s.attempt + 1, "mismatches": s.mismatches},
         status=Status.EXTRACTED,
     )  # fmt: skip
     return Reconciled(inv)
+
+
+@g.step
+async def duplicate(ctx: StepContext[State, Deps, DuplicateFound]) -> Outcome:
+    """A copy of an invoice already on file: never processed or paid again."""
+    s = ctx.state
+    assert s.key is not None
+    decision = Decision(kind="reject", actor="ledger", reasons=[json.dumps(ctx.inputs.why)])
+    return Outcome(key=s.key, status=Status.DUPLICATE_SKIPPED, decision=decision, findings=s.findings,
+                   run_id=s.run_id, invoice=ctx.inputs.invoice)  # fmt: skip
 
 
 @g.step
@@ -202,6 +269,10 @@ async def validate(ctx: StepContext[State, Deps, Reconciled]) -> approval.Route:
         payload={"findings": [f.model_dump() for f in s.findings]}, status=Status.VALIDATED,
     )  # fmt: skip
     r = approval.route(inv, s.findings, fx.to_usd(inv.total, inv.currency, fx.rates(d.conn)))
+    if s.amount_due is not None and isinstance(r, AutoApprove | VpReview):
+        db.record(d.conn, s.key, EventType.REVISION_AFTER_PAYMENT, actor="ledger", run_id=s.run_id,
+                  payload={"amount_due": str(s.amount_due)})  # fmt: skip
+        r = HumanReview(inv, r.findings, r.usd_total, reason="revision_after_payment")
     d.tracer.log("route", route=type(r).__name__, findings=[f.rule_id for f in s.findings])
     return r
 
@@ -319,7 +390,10 @@ async def escalate(ctx: StepContext[State, Deps, HumanReview]) -> Outcome:
     r = ctx.inputs
     decision = Decision(kind="escalate", actor="approval", reasons=[r.reason], label=r.label)
     key = _decided(ctx, decision)
-    db.enqueue_inbox(ctx.deps.conn, key, reason=r.reason, label=r.label, run_id=ctx.state.run_id, actor="approval")
+    db.enqueue_inbox(
+        ctx.deps.conn, key, reason=r.reason, label=r.label, run_id=ctx.state.run_id, actor="approval",
+        amount_due=ctx.state.amount_due,
+    )  # fmt: skip
     return Outcome(
         key=key,
         status=Status.ESCALATED,
@@ -365,7 +439,10 @@ g.add(
         g.decision().branch(g.match(Extracted).to(reconcile_step)).branch(g.match(ExtractFailed).to(extract_failed))
     ),
     g.edge_from(reconcile_step).to(
-        g.decision().branch(g.match(Reconciled).to(validate)).branch(g.match(Retry).to(retry))
+        g.decision().branch(g.match(Reconciled).to(ledger_check)).branch(g.match(Retry).to(retry))
+    ),
+    g.edge_from(ledger_check).to(
+        g.decision().branch(g.match(Reconciled).to(validate)).branch(g.match(DuplicateFound).to(duplicate))
     ),
     g.edge_from(retry).to(extract),
     g.edge_from(validate).to(
@@ -385,7 +462,7 @@ g.add(
         .branch(g.match(Objected).to(vp_propose))
         .branch(g.match(HumanReview).to(escalate))
     ),
-    g.edge_from(pay, reject, escalate, load_failed, extract_failed).to(g.end_node),
+    g.edge_from(pay, reject, escalate, load_failed, extract_failed, duplicate).to(g.end_node),
 )
 graph = g.build()
 

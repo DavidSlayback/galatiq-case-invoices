@@ -1,5 +1,7 @@
 """Command-line interface (Typer)."""
 
+import contextlib
+import io
 from datetime import date
 from pathlib import Path
 from typing import Annotated
@@ -13,7 +15,7 @@ from invoice_agents import settings as settings_mod
 from invoice_agents.agents.cli_bridge import BackendQuotaError
 from invoice_agents.agents.models import detect
 from invoice_agents.agents.offline import MissingFixture
-from invoice_agents.report import outcome_panel
+from invoice_agents.report import history_table, outcome_panel, summary_table
 from invoice_agents.seed import open_db
 from invoice_agents.seed import reset as reset_db
 
@@ -60,6 +62,9 @@ def main(
     invoice_path: Annotated[
         Path | None, typer.Option("--invoice_path", "--invoice-path", help="Process one invoice file.")
     ] = None,
+    invoice_dir: Annotated[
+        Path | None, typer.Option("--invoice_dir", "--invoice-dir", help="Process every file in a directory.")
+    ] = None,
     model: ModelOpt = None,
     offline: OfflineOpt = False,
     as_of: AsOfOpt = None,
@@ -68,10 +73,13 @@ def main(
     """Process invoices end to end. `--invoice_path` is the brief's entry point."""
     if ctx.invoked_subcommand is not None:
         return
-    if invoice_path is None:
+    if invoice_dir is not None:
+        batch(invoice_dir, model=model, offline=offline, as_of=as_of, db=db)
+    elif invoice_path is not None:
+        process(invoice_path, model=model, offline=offline, as_of=as_of, db=db)
+    else:
         console.print(ctx.get_help())
         raise typer.Exit(0)
-    process(invoice_path, model=model, offline=offline, as_of=as_of, db=db)
 
 
 @app.command()
@@ -120,9 +128,39 @@ def eval_cmd(
 
 
 @app.command()
-def history(invoice_number: str) -> None:
-    """Show the event timeline for one invoice."""
-    _not_yet()
+def history(invoice_number: str, db: DbOpt = None) -> None:
+    """Show the event timeline for one invoice (every vendor and revision with that number)."""
+    s = build_settings(None, False, None, db)
+    conn = open_db(s.db_path)
+    rows = conn.execute("SELECT * FROM invoice_events WHERE invoice_number=? ORDER BY id", (invoice_number,)).fetchall()
+    if not rows:
+        console.print(f"[yellow]No events for {invoice_number}.[/yellow]")
+        raise typer.Exit(1)
+    console.print(history_table(rows))
+
+
+@app.command()
+def batch(
+    invoice_dir: Path,
+    model: ModelOpt = None,
+    offline: OfflineOpt = False,
+    as_of: AsOfOpt = None,
+    db: DbOpt = None,
+) -> None:
+    """Process every file in a directory, in name order, and print a summary."""
+    s = with_backend(build_settings(model, offline, as_of, db))
+    conn = open_db(s.db_path)
+    outcomes = []
+    for path in sorted(p for p in invoice_dir.rglob("*") if p.is_file()):
+        try:
+            with contextlib.redirect_stdout(io.StringIO()):
+                outcomes.append(graph.process_sync(path, s, conn))
+        except MissingFixture as e:
+            console.print(f"[red]skipped {path.name}:[/red] {e}")
+        except BackendQuotaError as e:
+            console.print(f"[red]Stopped: {e}[/red]")
+            raise typer.Exit(3) from e
+    console.print(summary_table(outcomes))
 
 
 @app.command()

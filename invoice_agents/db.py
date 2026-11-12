@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS fx_rates (
     currency TEXT PRIMARY KEY, usd_rate TEXT NOT NULL, as_of TEXT NOT NULL, source TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS invoices (
     vendor TEXT NOT NULL, invoice_number TEXT NOT NULL, revision INTEGER NOT NULL,
-    status TEXT NOT NULL, content_hash TEXT, total TEXT, currency TEXT, source_path TEXT,
+    status TEXT NOT NULL, content_hash TEXT, core TEXT, total TEXT, currency TEXT, source_path TEXT,
     updated_at TEXT NOT NULL, PRIMARY KEY (vendor, invoice_number));
 CREATE TABLE IF NOT EXISTS invoice_events (
     id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT NOT NULL, run_id TEXT NOT NULL,
