@@ -84,5 +84,7 @@ Decisions from the grilling session on 2026-11-12. Each one comes from David unl
 
 ## Agent choices (not decided by David; flag if wrong)
 
+David reviewed these on 2026-11-12: "Agreed with decisions."
+
 - The VP critique loop and the extraction loop each allow at most 2 retries, as offered in the options David picked.
 - The expected outcomes in PRD §5 become `expected_outcomes.yaml`, adjusted for D2 (1004 R1 supersedes 1004) and D10 (fraud cases escalate unless a hard rule rejects them first).
