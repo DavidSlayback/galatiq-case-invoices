@@ -162,7 +162,11 @@ def _record(
         " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
         (ts, run_id, key.vendor, key.invoice_number, key.revision, event, actor, json_dumps(payload or {})),
     )
-    if status is not None:
+    if status is None:  # still a sign of life: run recovery (D46) judges staleness by this column
+        conn.execute(
+            "UPDATE invoices SET updated_at=? WHERE vendor=? AND invoice_number=?", (ts, key.vendor, key.invoice_number)
+        )
+    else:
         fields = {k: (str(v) if isinstance(v, Decimal) else v) for k, v in invoice_fields.items()}
         cols = ["vendor", "invoice_number", "revision", "status", "updated_at", *fields]
         vals = [key.vendor, key.invoice_number, key.revision, status, ts, *fields.values()]

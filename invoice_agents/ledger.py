@@ -9,6 +9,7 @@ and even in which optional fields they state (1011's PDF has no subtotal).
 import json
 import sqlite3
 from dataclasses import dataclass, field
+from datetime import timedelta
 from decimal import Decimal
 from typing import Any
 
@@ -105,15 +106,21 @@ Check = New | Duplicate | Conflict | Revision | Stale
 _IN_FLIGHT = ("received", "extracted", "validated", "escalated")
 
 
+# A run that has not touched its invoice for this long is dead. Worst case for a live run:
+# 3 extraction attempts plus 2 VP-and-critic rounds (4 calls), each capped at the CLI
+# bridge's 180 s timeout, is 7 x 180 s = 21 min; every event also refreshes the row.
+RUN_STALE_AFTER = timedelta(minutes=30)
+
+
 def _interrupted(conn: sqlite3.Connection, key: InvoiceKey, row: sqlite3.Row) -> bool:
     """A run died after recording this invoice but before it reached an outcome (D46).
 
-    True when the status row has not moved for ``db.STALE_AFTER``, no inbox item is open,
+    True when the status row has not moved for ``RUN_STALE_AFTER``, no inbox item is open,
     and no payment was started for this revision (a pending payment is the payment sweep's
     job). Re-running the file then processes it again instead of skipping it as a duplicate.
-    The threshold is a heuristic: a live run whose agent calls take longer also qualifies.
+    The threshold is derived from the agent timeouts, so a live run never qualifies.
     """
-    if row["status"] not in _IN_FLIGHT or not db.is_stale(row["updated_at"]):
+    if row["status"] not in _IN_FLIGHT or not db.is_stale(row["updated_at"], RUN_STALE_AFTER):
         return False
     open_item = conn.execute(
         "SELECT 1 FROM inbox WHERE vendor=? AND invoice_number=? AND status='open'", (key.vendor, key.invoice_number)
@@ -266,8 +273,11 @@ def intake(
             payload={"previous_revision": found.previous_revision, "revision": inv.revision,
                      "already_paid": str(found.already_paid), **found.changes},
         )  # fmt: skip
-        if found.already_paid > 0 and inv.total is not None:
-            amount_due = inv.total - found.already_paid
+    # Anything already paid on this invoice (an earlier revision, or this one before a crash
+    # cut its run short) sends the rest to a person rather than an agent (A8, D46).
+    paid = already_paid(conn, key.vendor, key.invoice_number)
+    if paid > 0 and inv.total is not None:
+        amount_due = inv.total - paid
     db.record(conn, key, EventType.EXTRACTED, actor="extractor", run_id=run_id, payload=extracted,
               status=Status.EXTRACTED)  # fmt: skip
     return Intake(key, verdict, findings=findings, amount_due=amount_due)

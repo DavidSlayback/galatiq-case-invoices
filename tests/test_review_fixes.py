@@ -197,7 +197,38 @@ def test_r17_an_invoice_a_crash_left_after_its_decision_is_resumed_by_a_rerun(
         graph.process_sync(INVOICES / "invoice_1004.json", offline, conn)
     monkeypatch.undo()
     assert graph.process_sync(INVOICES / "invoice_1004.json", offline, conn).status == Status.DUPLICATE_SKIPPED
-    with conn:  # an hour later nothing has moved
+    with conn:  # nothing has moved for longer than any live run can take
         conn.execute("UPDATE invoices SET updated_at='2000-01-01T00:00:00'")
     again = graph.process_sync(INVOICES / "invoice_1004.json", offline, conn)
     assert again.status == Status.PAID and db.payment_state(conn, again.key) == ("sent", Decimal("1890.00"))
+
+
+def test_r18_a_resumed_revision_of_a_paid_invoice_still_goes_to_a_person(
+    conn: sqlite3.Connection, offline: Settings, monkeypatch: pytest.MonkeyPatch
+):
+    """R1 of a paid invoice crashes after intake; the resumed run must not auto-pay the difference."""
+    from invoice_agents import approval
+
+    graph.process_sync(INVOICES / "invoice_1004.json", offline, conn)
+
+    def dies(*_: object, **__: object) -> None:
+        raise Crash
+
+    monkeypatch.setattr(approval, "route", dies)
+    with pytest.raises(Crash):
+        graph.process_sync(INVOICES / "invoice_1004_revised.json", offline, conn)
+    monkeypatch.undo()
+    with conn:
+        conn.execute("UPDATE invoices SET updated_at='2000-01-01T00:00:00'")
+    again = graph.process_sync(INVOICES / "invoice_1004_revised.json", offline, conn)
+    assert again.status == Status.ESCALATED
+    assert [i.reason for i in inbox.list_open(conn)] == ["revision_after_payment"]
+
+
+def test_r19_a_recent_unfinished_invoice_is_left_to_its_live_run(conn: sqlite3.Connection, offline: Settings):
+    """Two minutes is not dead: an invoice mid-review stays a duplicate until the run bound passes."""
+    graph.process_sync(INVOICES / "invoice_1004.json", offline, conn)
+    with conn:
+        conn.execute("UPDATE invoices SET status='validated', updated_at=?", (db.now(),))
+        conn.execute("DELETE FROM payments")
+    assert graph.process_sync(INVOICES / "invoice_1004.json", offline, conn).status == Status.DUPLICATE_SKIPPED

@@ -70,7 +70,8 @@ def pay(
     """
     state = db.payment_state(conn, key)
     if state and state[0] == "sent":
-        db.record(conn, key, EventType.PAYMENT_SKIPPED_ALREADY_PAID, actor="payment", run_id=run_id)
+        db.record(conn, key, EventType.PAYMENT_SKIPPED_ALREADY_PAID, actor="payment", run_id=run_id,
+                  status=Status.PAID)  # fmt: skip
         return PaymentResult(Status.PAID, Decimal(0))
     if state and state[0] == "pending":  # an earlier attempt died after (or before) the bank call: never guess
         _unconfirmed(conn, key, state[1], run_id, "an earlier attempt did not finish")
@@ -78,7 +79,7 @@ def pay(
     amount = total - ledger.already_paid(conn, key.vendor, key.invoice_number)
     if amount <= 0:  # B6: a revision below what was paid is a credit to recover, never a bank payment
         db.record(conn, key, EventType.PAYMENT_SKIPPED_ALREADY_PAID, actor="payment", run_id=run_id,
-                  payload={"credit_due": str(-amount)})  # fmt: skip
+                  payload={"credit_due": str(-amount)}, status=Status.PAID)  # fmt: skip
         return PaymentResult(Status.PAID, Decimal(0))
     # Scale the USD figure to the amount actually sent (a revision delta pays only part of the total).
     usd = (amount * usd_equivalent / total).quantize(fx.CENT) if usd_equivalent and total else amount
