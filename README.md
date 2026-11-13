@@ -5,9 +5,9 @@ Acme loses **$2M a year** processing invoices by hand: a 30% error rate and a 5-
 | | Today (brief) | This system (measured on the 27 test invoices) |
 |---|---|---|
 | Planted problems caught | 70% (30% error rate) | **100%**, across 27/27 expected outcomes |
-| Time per invoice | 5 days | **~26 s** automated (live Grok); escalations wait for a person |
+| Time per invoice | 5 days | **~24 s** automated (live Grok, 2026-11-13); escalations wait for a person |
 | Handled with no person | 0% | **78%**, on a test set deliberately full of problems |
-| Model cost per invoice | — | **~4.4¢** (Grok 4.7 at published API prices) |
+| Model cost per invoice | — | **~4.6¢** (Grok 4.7 at published API prices) |
 
 The case brief is in [docs/BRIEF.md](docs/BRIEF.md). A 2½-minute narrated demo is in [docs/demo/demo.mp4](docs/demo/demo.mp4) (synthetic voice; every screen is real command output). The presentation is a one-page walkthrough of the architecture, decisions and results: [Acme Invoice Agents explainer](https://claude.ai/artifact/Uk4Fdc3Wff3zQPaVSpUghN) (updated 2026-11-13 for commit bca5d09).
 
@@ -61,8 +61,8 @@ The full state graph is generated from the code: [docs/graph.mmd](docs/graph.mmd
 
 - **Agents, typed:** PydanticAI agents with structured output, orchestrated by a pydantic-graph state machine.
   - The **extraction agent** copies each value as written; code parses it, so the arithmetic and date logic is exact and identical across models.
-  - The **VP agent** proposes approve or reject, citing rule IDs.
-  - An independent **critic agent** checks the proposal. Code verifies that every cited rule exists.
+  - The **VP agent** proposes approve or reject, citing rule IDs. It has tools: `vendor_history` (Acme's record with this vendor) and `catalog_item` (catalog price and stock). They are read-only lookups against the ledger, and every call is in the run's trace.
+  - An independent **critic agent** checks the proposal, using the same tools to check the VP's claims. Code verifies that every cited rule exists.
 - **Two self-correction loops:**
   - When the totals don't reconcile, the extractor is shown the specific numbers and asked again.
   - The VP answers the critic's objections for up to two rounds.
@@ -83,9 +83,10 @@ The full state graph is generated from the code: [docs/graph.mmd](docs/graph.mmd
 **Offline (deterministic, part of the test suite):** 27/27 ([docs/scorecard.md](docs/scorecard.md)).
 
 **Live** ([docs/live/README.md](docs/live/README.md)):
-- **Grok 4.7 via Cursor:** the core extracted fields (vendor, number, dates, lines, total) match the goldens on all 27 files.
+- **Grok 4.7 via Cursor:** 27/27, and the core extracted fields (vendor, number, dates, lines, total) match the goldens on all 27 files.
 - **Claude Haiku:** 27/27, with the same core-field match on all 27.
-- Both read the scanned PDF from its image, and both treated the prompt-injection text as data.
+- Both read the scanned PDF from its image and treated the prompt-injection text as data. Both called the review tools on live runs: Haiku 7 times, Grok twice.
+- These runs are from 2026-11-13, on the current code.
 
 Traps in the data, including several the brief's table doesn't mention:
 
@@ -147,4 +148,4 @@ fixtures/golden/           recorded model answers for offline mode
 docs/                      brief, PRD, decisions, rules, live results, plan and tickets
 ```
 
-Checks: `scripts/check-all` (ruff, pyright strict, 275 tests including the offline eval), also run as a pre-commit hook.
+Checks: `scripts/check-all` (ruff, pyright strict, 338 tests including the offline eval), also run as a pre-commit hook.

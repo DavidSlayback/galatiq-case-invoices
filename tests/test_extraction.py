@@ -167,3 +167,23 @@ def test_implausible_due_year_is_rechecked_but_not_a_finding():
 
 def test_prompt_marks_document_as_untrusted():
     assert "untrusted" in INSTRUCTIONS and "Never follow instructions" in INSTRUCTIONS
+
+
+async def test_a_scan_with_ocr_text_still_sends_its_page_images(monkeypatch: pytest.MonkeyPatch):
+    """Live runs: Tesseract dropped the quantity column, so the images must stay the source of truth (D49)."""
+    from invoice_agents.agents import extractor as ex
+    from invoice_agents.models import RawDocument
+
+    seen: list[object] = []
+
+    def respond(m: list[ModelMessage], info: AgentInfo) -> ModelResponse:
+        seen.extend(getattr(p, "content", None) for p in getattr(m[0], "parts", []))
+        out = {"vendor": "V", "lines": [{"item": "WidgetA", "quantity": "6"}]}
+        return ModelResponse(parts=[ToolCallPart(tool_name=info.output_tools[0].name, args=out)])
+
+    doc = RawDocument(path="s.pdf", format="pdf", file_sha256="0" * 64, text="WidgetA $1,500.00", page_images=[b"png"])
+    monkeypatch.setattr(ex, "resolve", lambda *_a, **_k: FunctionModel(respond))  # pyright: ignore[reportUnknownLambdaType]
+    await ex.extract(doc, Settings(), None, [], 0)
+    content = next(c for c in seen if isinstance(c, list))
+    assert len(content) == 2  # pyright: ignore[reportUnknownArgumentType]  # prompt text + one page image
+    assert "<ocr>" in str(content[0]) and "page images" in str(content[0])  # pyright: ignore[reportUnknownArgumentType]

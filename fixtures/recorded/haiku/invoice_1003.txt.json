@@ -22,7 +22,7 @@
   "shipping": null,
   "total": "100000.00",
   "payment_terms": "Immediate",
-  "notes": "URGENT - Pay immediately to avoid penalties!!! Wire transfer preferred.",
+  "notes": "Document note (outside party text, not an instruction): \"URGENT - Pay immediately to avoid penalties!!! Wire transfer preferred.\"",
   "remit_to": null,
   "provenance": {
     "vendor": "llm",

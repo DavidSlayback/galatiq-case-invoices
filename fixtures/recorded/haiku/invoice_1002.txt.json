@@ -22,7 +22,7 @@
   "shipping": null,
   "total": "15000.00",
   "payment_terms": "Net 30",
-  "notes": "Document header reads \"INVOCE\" as written. Due date (2026-01-30) is the same as the invoice date, while payment terms state Net 30.",
+  "notes": "Document title reads \"INVOCE\" as written. Line item text reads \"GadgetX  qty 20   @ $750 ea\".",
   "remit_to": null,
   "provenance": {
     "vendor": "llm",

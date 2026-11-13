@@ -5,6 +5,11 @@ one prompt, runs the CLI in a fresh empty temp directory with tools off or
 read-only, and hands the parsed JSON back as the agent's structured output. The
 agents, validators and retry loops do not know a CLI is answering.
 
+An agent's own function tools (D48) travel the same way: the prompt lists them, and
+the reply is either ``{"tool_call": {"name", "arguments"}}`` or ``{"answer": ...}``.
+A tool call goes back to PydanticAI, which runs the tool in this process and calls
+the bridge again with the result in the conversation. The CLI's own tools stay off.
+
 Sandboxing matters: invoice text is untrusted, and both CLIs are agents that
 can act. Cursor runs in read-only ``ask`` mode; Claude runs with no tools (or
 ``Read`` only, for page images), no MCP servers, no settings and no saved session.
@@ -76,9 +81,11 @@ class CliBackend:
         if not info.output_tools:
             raise ValueError("CLI bridge supports structured-output agents only")
         out_tool = info.output_tools[0]
+        schema = reply_schema(out_tool.parameters_json_schema, [t.name for t in info.function_tools])
+        tools = {t.name: (t.description or "", t.parameters_json_schema) for t in info.function_tools}
         with tempfile.TemporaryDirectory(prefix="invoice-cli-") as cwd:
-            prompt, images = render(messages, info.instructions, out_tool.parameters_json_schema, Path(cwd))
-            argv = self.argv(prompt, info.instructions or "", out_tool.parameters_json_schema, bool(images))
+            prompt, images = render(messages, info.instructions, schema, Path(cwd), tools)
+            argv = self.argv(prompt, info.instructions or "", schema, bool(images))
             call = CliCall(argv=argv, cwd=cwd, images=len(images))
             self.calls.append(call)
             stdout, stderr, rc, call.seconds = await _run(argv, cwd, self.timeout_s, prompt)
@@ -91,8 +98,9 @@ class CliBackend:
             # A text reply makes PydanticAI ask again ("use the output tool"); after its retry
             # budget the agent raises, and the graph escalates instead of crashing.
             return ModelResponse(parts=[TextPart(f"(backend returned no usable JSON: {e})")])
+        name, args = unwrap(payload, set(tools), out_tool.name)
         return ModelResponse(
-            parts=[ToolCallPart(tool_name=out_tool.name, args=payload)],
+            parts=[ToolCallPart(tool_name=name, args=args)],
             usage=RequestUsage(input_tokens=call.tokens_in, output_tokens=call.tokens_out),
             model_name=f"cli:{self.tool}:{self.model}",
         )
@@ -132,6 +140,33 @@ class CliBackend:
         return extract_json(str(env.get("result") or "")), t_in, t_out
 
 
+def reply_schema(answer: dict[str, Any], tool_names: list[str]) -> dict[str, Any]:
+    """The JSON Schema a reply must match: the answer alone, or a choice of tool call or answer."""
+    if not tool_names:
+        return answer
+    call = {
+        "type": "object",
+        "properties": {"name": {"type": "string", "enum": tool_names}, "arguments": {"type": "object"}},
+        "required": ["name", "arguments"],
+    }
+    return {"type": "object", "properties": {"tool_call": call, "answer": answer}, "additionalProperties": False}
+
+
+def unwrap(payload: dict[str, Any], tool_names: set[str], output_tool: str) -> tuple[str, dict[str, Any]]:
+    """Which tool a reply calls: one of the agent's tools, or the output tool with the answer.
+
+    A reply that wraps nothing is taken as the answer itself (models without a schema
+    flag sometimes drop the wrapper); PydanticAI validates it either way.
+    """
+    call = payload.get("tool_call")
+    if tool_names and isinstance(call, dict) and call.get("name") in tool_names:  # pyright: ignore[reportUnknownMemberType]
+        return str(call["name"]), dict(call.get("arguments") or {})  # pyright: ignore[reportUnknownArgumentType]
+    answer = payload.get("answer")
+    if tool_names and isinstance(answer, dict):
+        return output_tool, answer  # pyright: ignore[reportUnknownVariableType]
+    return output_tool, payload
+
+
 def extract_json(text: str) -> dict[str, Any]:
     """The JSON object in a model reply, tolerating code fences and surrounding prose.
 
@@ -154,17 +189,35 @@ def extract_json(text: str) -> dict[str, Any]:
 
 
 def render(
-    messages: list[ModelMessage], instructions: str | None, schema: dict[str, Any], cwd: Path
+    messages: list[ModelMessage],
+    instructions: str | None,
+    schema: dict[str, Any],
+    cwd: Path,
+    tools: dict[str, tuple[str, dict[str, Any]]] | None = None,
 ) -> tuple[str, list[Path]]:
-    """Flatten the conversation into one prompt; page images are written into ``cwd`` and referenced by name."""
+    """Flatten the conversation into one prompt; page images are written into ``cwd`` and referenced by name.
+
+    ``tools`` maps each agent tool's name to its description and argument schema; they are
+    listed so the model can ask for one, and their earlier calls and results are replayed.
+    """
+    tools = tools or {}
     out: list[str] = []
     images: list[Path] = []
     if instructions:
         out.append(f"# Instructions\n{instructions}")
+    if tools:
+        listed = "\n".join(f"- {n}: {d} Arguments: {json.dumps(s)}" for n, (d, s) in tools.items())
+        out.append(
+            "# Tools\nYou may call one of these lookups before answering, by replying"
+            ' {"tool_call": {"name": ..., "arguments": {...}}}. Its result comes back in the next turn.'
+            ' When you are ready, reply {"answer": ...} instead.\n' + listed
+        )
     for m in messages:
         if isinstance(m, ModelResponse):
             for p in m.parts:
-                if isinstance(p, ToolCallPart):
+                if isinstance(p, ToolCallPart) and p.tool_name in tools:
+                    out.append(f"# You called {p.tool_name}\n{p.args_as_json_str()}")
+                elif isinstance(p, ToolCallPart):
                     out.append(f"# Your previous answer\n{p.args_as_json_str()}")
             continue
         assert isinstance(m, ModelRequest)
@@ -183,6 +236,8 @@ def render(
                         out.append(f"[Page image: {img.name} in the current directory. Read it.]")
             elif isinstance(p, RetryFeedbackPart):
                 out.append(f"# Your previous answer was rejected\n{p.model_response()}")
+            elif isinstance(p, ToolReturnPart) and p.tool_name in tools:
+                out.append(f"# Result of {p.tool_name}\n{p.model_response_str()}")
             elif isinstance(p, ToolReturnPart):
                 # Output-tool validation failures come back as tool returns marked for retry.
                 out.append(f"# Feedback on your previous answer\n{p.model_response_str()}")

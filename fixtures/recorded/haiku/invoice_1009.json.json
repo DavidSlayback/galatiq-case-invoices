@@ -30,7 +30,7 @@
   "shipping": null,
   "total": "-250.00",
   "payment_terms": null,
-  "notes": "Values copied as stated in the document; they do not reconcile. Lines (WidgetA -5 x 250.00, WidgetB 2 x 500.00) sum to -250.00, but the stated subtotal is 1000.00 and the stated total is -250.00. Subtotal 1000.00 + tax 0.00 + shipping (none stated) does not equal the stated total -250.00. Vendor name is blank in the source document. Tax rate shown as 0.0. WidgetA quantity is -5 and the total is negative. Source document has no due date, payment terms, or remittance details.",
+  "notes": "Vendor name and address are blank in the source. Payment terms and due date are not stated. Tax rate is 0.0 and tax amount is 0.00 as written. The document states subtotal 1000.00 and total -250.00; these are kept as written. Line 1 quantity is -5 as written. The line items (WidgetA -5 x 250.00; WidgetB 2 x 500.00) do not reconcile with the stated subtotal of 1000.00, and the stated total is negative. All values are copied unchanged and flagged for review.",
   "remit_to": null,
   "provenance": {
     "vendor": "missing",

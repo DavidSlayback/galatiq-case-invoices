@@ -38,7 +38,7 @@
   "shipping": null,
   "total": "9975.00",
   "payment_terms": "Net 30",
-  "notes": "Ref PO-20260115. Deliver to warehouse dock B. Contact Jim at ext 4421 with questions. Vendor shown as \"QuickShip Distributers (formerly FastShip Ltd.)\". Tax line labeled \"TAX (5%)\". Attn line reads \"Accounts Payble\" as written.",
+  "notes": "Vendor shown as \"QuickShip Distributers (formerly FastShip Ltd.)\". Tax label: \"TAX (5%)\". Attn line reads \"Accounts Payble\". Ref PO-20260115. Deliver to warehouse dock B. Contact Jim at ext 4421 with questions.",
   "remit_to": null,
   "provenance": {
     "vendor": "llm",

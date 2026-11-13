@@ -46,7 +46,7 @@
   "shipping": "150.00",
   "total": "7185.00",
   "payment_terms": "Net 30",
-  "notes": "Bill To: Acme Corp Manufacturing Division. Closing text: \"Thank you for your business!\"",
+  "notes": "Bill To: Acme Corp Manufacturing Division. Sales Tax label on document: \"Sales Tax\". Footer text: \"Thank you for your business!\"",
   "remit_to": null,
   "provenance": {
     "vendor": "llm",

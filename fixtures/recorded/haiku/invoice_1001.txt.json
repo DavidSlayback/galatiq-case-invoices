@@ -30,7 +30,7 @@
   "shipping": null,
   "total": "5000.00",
   "payment_terms": "Net 15",
-  "notes": "Tax line labelled \"Tax (0%)\". No line-level amounts are shown on the document.",
+  "notes": null,
   "remit_to": null,
   "provenance": {
     "vendor": "llm",
@@ -46,7 +46,7 @@
     "shipping": "missing",
     "total": "llm",
     "payment_terms": "llm",
-    "notes": "llm",
+    "notes": "missing",
     "remit_to": "missing"
   }
 }

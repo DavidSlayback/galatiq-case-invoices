@@ -38,7 +38,7 @@
   "shipping": null,
   "total": "15525.00",
   "payment_terms": null,
-  "notes": "Tax label as written: \"Tax (6%):\". Does not reconcile: Subtotal 14750.00 + Tax 885.00 = 15635.00, but the stated Total is 15525.00. Total copied as written and not corrected; no shipping line shown. Source is a CSV-style document; the subtotal, tax and total appear as labelled rows in the Line Total column.",
+  "notes": "Tax line labelled \"Tax (6%)\". The document states Total 15525.00, which does not equal Subtotal 14750.00 plus Tax 885.00 (15635.00). The figures are kept as written on the document and were not corrected.",
   "remit_to": null,
   "provenance": {
     "vendor": "llm",
