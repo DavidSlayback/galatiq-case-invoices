@@ -6,7 +6,7 @@ is an error, never a guess.
 """
 
 import json
-from functools import cache
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -20,27 +20,34 @@ class MissingFixture(LookupError):
     """No golden output exists for this input in offline mode."""
 
 
-@cache
-def _index(kind: str) -> dict[str, dict[str, Any]]:
+def _index(directory: Path) -> dict[str, dict[str, Any]]:
+    # Keyed on each file's name, size and mtime, so a directory rewritten in place is re-read.
+    files = sorted(directory.glob("*.json"))
+    return _load(tuple((p, p.stat().st_mtime_ns, p.stat().st_size) for p in files))
+
+
+@lru_cache(maxsize=64)
+def _load(signature: tuple[tuple[Path, int, int], ...]) -> dict[str, dict[str, Any]]:
     out: dict[str, dict[str, Any]] = {}
-    for p in sorted((GOLDEN_DIR / kind).glob("*.json")):
+    for p, _, _ in signature:
         g = json.loads(p.read_text(encoding="utf-8"))
         out[g["file_sha256"]] = g
     return out
 
 
-def golden(kind: str, file_sha256: str, source: str) -> dict[str, Any]:
+def golden(kind: str, file_sha256: str, source: str, golden_dir: Path = GOLDEN_DIR) -> dict[str, Any]:
     """Look up the golden output of one agent for one input file.
 
     Args:
         kind: Agent kind (``extract``, ``vp``, ``critic``).
         file_sha256: Hash of the input file.
         source: Path, for the error message.
+        golden_dir: Replay source; ``Settings.golden_dir`` picks it per run.
 
     Raises:
         MissingFixture: No golden for this file.
     """
-    g = _index(kind).get(file_sha256)
+    g = _index(golden_dir / kind).get(file_sha256)
     if g is None:
         raise MissingFixture(f"no offline '{kind}' golden for {source} (sha256 {file_sha256[:12]}…)")
     return g

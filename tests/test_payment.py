@@ -58,3 +58,10 @@ def test_rejection_names_bad_lines(conn: sqlite3.Connection, offline: Settings):
     graph.process_sync(INVOICES / "invoice_1016.json", offline, conn)
     ev = db.events(conn, "Widgets Inc.", "INV-1016")[-1]
     assert ev["event"] == "rejected" and json.loads(ev["payload"])["bad_lines"] == ["WidgetC"]
+
+
+def test_bank_failure_through_the_graph_goes_to_the_inbox(conn: sqlite3.Connection, offline: Settings):
+    bank, calls = calls_recorder(ConnectionError("bank down"))
+    o = graph.process_sync(INVOICES / "invoice_1004.json", offline, conn, bank=bank)
+    assert o.status == Status.PAYMENT_FAILED and len(calls) == payment.ATTEMPTS
+    assert conn.execute("SELECT reason FROM inbox").fetchone()[0] == "payment_failed"

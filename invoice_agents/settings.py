@@ -5,6 +5,8 @@ from dataclasses import dataclass, replace
 from datetime import date
 from pathlib import Path
 
+from invoice_agents.agents.offline import GOLDEN_DIR
+
 # The sample invoices are dated Jan-Feb 2026; checking them against the real
 # date would make every one past due (D8).
 DEFAULT_AS_OF = date(2026, 2, 1)
@@ -21,6 +23,7 @@ class Settings:
         as_of: Processing date used by date rules.
         offline: Replay golden model outputs instead of calling a model.
         runs_dir: Directory for per-run JSONL agent traces.
+        golden_dir: Recorded answers that offline replay serves.
     """
 
     model: str | None = None
@@ -28,6 +31,7 @@ class Settings:
     as_of: date = DEFAULT_AS_OF
     offline: bool = False
     runs_dir: Path = Path("runs")
+    golden_dir: Path = GOLDEN_DIR
 
     def with_overrides(self, **changes: object) -> Settings:
         """Return a copy with every non-None override applied."""

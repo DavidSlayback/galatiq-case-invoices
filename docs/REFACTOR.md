@@ -18,7 +18,7 @@ The interface choices below were made by the agent while implementing, as the sk
 - [x] 2 store transitions: D41. Crash, rollback and migration tests; writing the pending row after the bank call fails 4 tests; gate and eval 27/27 pass.
 - [x] 3 settlement: D42; D19 reworded. Human decisions now write DECIDED (the inbox tests were updated to expect it); gate and eval 27/27 pass.
 - [x] 4 graph policy: D43. graph.py went from 495 to 395 lines; the guardrail test that monkeypatched `route` was replaced by `test_settle`; gate and eval 27/27 pass.
-- [ ] 5 adapters
+- [x] 5 adapters: D44. No test patches GOLDEN_DIR or clears a private cache; a bank failure now runs through the graph in a test; gate and eval 27/27 pass.
 - [ ] Fresh-context review of the stack, then merge
 
 Existing databases keep their old `NOCASE` columns until `main.py reset` rebuilds them. `connect` adds the new `payments.status` column in place.

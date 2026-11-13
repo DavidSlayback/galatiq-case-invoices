@@ -5,7 +5,6 @@ from pathlib import Path
 import pytest
 
 from invoice_agents import db, graph
-from invoice_agents.agents import offline as offline_mod
 from invoice_agents.agents.offline import MissingFixture
 from invoice_agents.models import Status
 from invoice_agents.settings import Settings
@@ -51,12 +50,7 @@ def test_reconcile_retries_then_accepts(
     golden["attempts"] = [bad, bad, golden["output"]]
     (tmp_path / "extract").mkdir()
     (tmp_path / "extract" / "g.json").write_text(json.dumps(golden))
-    monkeypatch.setattr(offline_mod, "GOLDEN_DIR", tmp_path)
-    offline_mod._index.cache_clear()  # pyright: ignore[reportPrivateUsage]
-    try:
-        o = graph.process_sync(INVOICES / "invoice_1004.json", offline, conn)
-    finally:
-        offline_mod._index.cache_clear()  # pyright: ignore[reportPrivateUsage]
+    o = graph.process_sync(INVOICES / "invoice_1004.json", offline.with_overrides(golden_dir=tmp_path), conn)
     attempts = [json.loads(x) for x in (offline.runs_dir / f"{o.run_id}.jsonl").read_text().splitlines()]
     assert [a["attempt"] for a in attempts if a["node"] == "extract"] == [0, 1, 2]
     assert o.status == Status.PAID and o.findings == []

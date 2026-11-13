@@ -1,6 +1,6 @@
 import json
 import sqlite3
-from collections.abc import Iterator
+from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
@@ -8,7 +8,6 @@ from typing import Any
 import pytest
 
 from invoice_agents import approval, graph
-from invoice_agents.agents import offline as offline_mod
 from invoice_agents.approval import AutoApprove, HumanReview, Reject, VpReview, guard, route
 from invoice_agents.models import Decision, Finding, Invoice, Status
 from invoice_agents.settings import Settings
@@ -71,24 +70,28 @@ def approve(*ids: str) -> dict[str, Any]:
     return {"decision": "approve", "reasons": ["ok"], "cited_rule_ids": list(ids)}
 
 
+@dataclass
+class Replay:
+    """A temp replay directory: call it to script the vp or critic answers; run with ``settings``."""
+
+    directory: Path
+    sha256: str
+    settings: Settings
+
+    def __call__(self, kind: str, attempts: list[dict[str, Any]]) -> None:
+        g = {"source": "x", "file_sha256": self.sha256, "attempts": attempts}
+        (self.directory / kind / "g.json").write_text(json.dumps(g))
+
+
 @pytest.fixture
-def goldens(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Any]:
-    """Point offline replay at a temp dir; returns a writer for vp/critic scripts."""
+def goldens(tmp_path: Path, offline: Settings) -> Replay:
     base = json.loads((ROOT / "fixtures/golden/extract/invoice_1004_json.json").read_text())
     base["output"] |= {"lines": LINES, "subtotal": "12500.00", "tax": "0", "total": "12500.00"}
     gdir = tmp_path / "golden"
     for kind in ("extract", "vp", "critic"):
         (gdir / kind).mkdir(parents=True)
     (gdir / "extract" / "g.json").write_text(json.dumps(base))
-
-    def script(kind: str, attempts: list[dict[str, Any]]) -> None:
-        g = {"source": "x", "file_sha256": base["file_sha256"], "attempts": attempts}
-        (gdir / kind / "g.json").write_text(json.dumps(g))
-
-    monkeypatch.setattr(offline_mod, "GOLDEN_DIR", gdir)
-    offline_mod._index.cache_clear()  # pyright: ignore[reportPrivateUsage]
-    yield script
-    offline_mod._index.cache_clear()  # pyright: ignore[reportPrivateUsage]
+    return Replay(gdir, base["file_sha256"], offline.with_overrides(golden_dir=gdir))
 
 
 def run(conn: sqlite3.Connection, offline: Settings) -> tuple[Any, list[dict[str, Any]]]:
@@ -97,25 +100,25 @@ def run(conn: sqlite3.Connection, offline: Settings) -> tuple[Any, list[dict[str
     return o, trace
 
 
-def test_vp_approves_and_critic_agrees(conn: sqlite3.Connection, offline: Settings, goldens: Any):
+def test_vp_approves_and_critic_agrees(conn: sqlite3.Connection, offline: Settings, goldens: Replay):
     goldens("vp", [approve()])
     goldens("critic", [{"agrees": True}])
-    o, _ = run(conn, offline)
+    o, _ = run(conn, goldens.settings)
     assert o.status == Status.PAID and o.decision is not None and o.decision.actor == "vp_agent"
 
 
-def test_disagreement_for_two_rounds_goes_to_inbox(conn: sqlite3.Connection, offline: Settings, goldens: Any):
+def test_disagreement_for_two_rounds_goes_to_inbox(conn: sqlite3.Connection, offline: Settings, goldens: Replay):
     goldens("vp", [approve(), approve()])
     goldens("critic", [{"agrees": False, "objections": ["a"]}, {"agrees": False, "objections": ["b"]}])
-    o, trace = run(conn, offline)
+    o, trace = run(conn, goldens.settings)
     assert o.status == Status.ESCALATED
     assert [t["round"] for t in trace if t["node"] == "critique"] == [0, 1]
     assert conn.execute("SELECT reason FROM inbox").fetchone()[0] == "vp_critic_disagree"
 
 
-def test_invented_citation_is_objected_in_code(conn: sqlite3.Connection, offline: Settings, goldens: Any):
+def test_invented_citation_is_objected_in_code(conn: sqlite3.Connection, offline: Settings, goldens: Replay):
     goldens("vp", [approve("MADE_UP"), approve()])
     goldens("critic", [{"agrees": True}])
-    o, trace = run(conn, offline)
+    o, trace = run(conn, goldens.settings)
     crit = [t for t in trace if t["node"] == "critique"]
     assert "MADE_UP" in crit[0]["verdict"]["objections"][0] and o.status == Status.PAID

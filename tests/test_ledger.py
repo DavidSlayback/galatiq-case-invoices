@@ -7,7 +7,6 @@ import pytest
 from typer.testing import CliRunner
 
 from invoice_agents import approval, db, graph, ledger
-from invoice_agents.agents import offline as offline_mod
 from invoice_agents.approval import HumanReview
 from invoice_agents.cli import app
 from invoice_agents.models import Status
@@ -88,13 +87,9 @@ def test_same_number_different_content_is_a_fraud_conflict(
                             {"item": "WidgetB", "quantity": "8", "unit_price": "1000.00"}]  # fmt: skip
     g["output"]["subtotal"], g["output"]["tax"] = "9750.00", "140.00"
     (gdir / "forged.json").write_text(json.dumps(g))
-    monkeypatch.setattr(offline_mod, "GOLDEN_DIR", tmp_path / "golden")
-    offline_mod._index.cache_clear()  # pyright: ignore[reportPrivateUsage]
-    try:
-        run(conn, offline, "invoice_1004.json")
-        o = graph.process_sync(forged, offline, conn)
-    finally:
-        offline_mod._index.cache_clear()  # pyright: ignore[reportPrivateUsage]
+    replay = offline.with_overrides(golden_dir=tmp_path / "golden")
+    run(conn, replay, "invoice_1004.json")
+    o = graph.process_sync(forged, replay, conn)
     assert "DUPLICATE_NUMBER_CONFLICT" in [f.rule_id for f in o.findings] and o.status == Status.ESCALATED
     assert "(conflict" in o.key.invoice_number
     row = db.invoice_row(conn, V, N)
