@@ -9,7 +9,7 @@ Acme loses **$2M a year** processing invoices by hand: a 30% error rate and a 5-
 | Handled with no person | 0% | **78%**, on a test set deliberately full of problems |
 | Model cost per invoice | — | **~4.6¢** (Grok 4.7 at published API prices) |
 
-The case brief is in [docs/BRIEF.md](docs/BRIEF.md). A 3-minute narrated demo is in [docs/demo/demo.mp4](docs/demo/demo.mp4) (synthetic voice; every screen is real command output). The presentation is a one-page walkthrough of the architecture, decisions and results: [Acme Invoice Agents explainer](https://claude.ai/artifact/Uk4Fdc3Wff3zQPaVSpUghN) (updated 2026-11-13 for commit f1e56a4).
+The case brief is in [docs/BRIEF.md](docs/BRIEF.md). A 3-minute narrated demo is in [docs/demo/demo.mp4](docs/demo/demo.mp4) (synthetic voice; every screen is real command output). The presentation is a one-page walkthrough of the architecture, decisions and results: [Acme Invoice Agents explainer](https://claude.ai/artifact/Uk4Fdc3Wff3zQPaVSpUghN) (updated 2026-11-13 for commit df1beec).
 
 ## Quickstart
 
@@ -157,4 +157,4 @@ fixtures/golden/           recorded model answers for offline mode
 docs/                      brief, PRD, decisions, rules, live results, plan and tickets
 ```
 
-Checks: `scripts/check-all` (ruff, pyright strict, 340 tests including the offline eval), also run as a pre-commit hook.
+Checks: `scripts/check-all` (ruff, pyright strict, 351 tests including the offline eval), also run as a pre-commit hook.
