@@ -143,6 +143,9 @@ def resolve(
     key = InvoiceKey(r["vendor"], r["invoice_number"], r["revision"])
     run_id = new_run_id()
     decision = {"kind": "approve" if approve else "reject", "note": note, "inbox_id": r["id"], "reason": r["reason"]}
+    if r["reason"] == "overpayment":  # money already left twice: the decision records the recovery, nothing is paid
+        db.resolve_inbox(conn, r["id"], key, reviewer=reviewer, run_id=run_id, decision=decision, status=Status.PAID)
+        return {"status": "recovery_recorded", "amount": r["amount_due"]}
     if r["reason"] == payment.UNCONFIRMED:  # approve = seen at the bank; reject = not there, retry from the inbox
         state = db.payment_state(conn, key)
         if state is None or state[0] != "pending":

@@ -116,7 +116,7 @@ def check(conn: sqlite3.Connection, key: InvoiceKey, inv: Invoice) -> Check:
     inbox = conn.execute(
         # Payment items stay open: a revision must not hide money that may already have left.
         "SELECT id FROM inbox WHERE vendor=? AND invoice_number=? AND status='open'"
-        " AND reason NOT IN ('payment_unconfirmed', 'payment_failed')",
+        " AND reason NOT IN ('payment_unconfirmed', 'payment_failed', 'overpayment')",
         (key.vendor, key.invoice_number),
     ).fetchall()
     return Revision(

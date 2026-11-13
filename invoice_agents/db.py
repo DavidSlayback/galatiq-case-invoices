@@ -281,16 +281,19 @@ def settle_payment(
             "SELECT status, attempt, amount_paid FROM payments WHERE vendor=? AND invoice_number=? AND revision=?",
             tuple(key),
         ).fetchone()
-        if row is not None and row["attempt"] != attempt:
+        # A newer attempt that was cancelled never sent anything: this late success is the only send.
+        if row is not None and row["attempt"] != attempt and row["status"] != "cancelled":
             amount = Decimal(str(payload.get("amount", row["amount_paid"])))
             conn.execute("INSERT INTO overpayments VALUES (?, ?, ?, ?, ?, ?)", (*key, attempt, str(amount), now()))
             _record(conn, key, EventType.PAID, actor, run_id, {**payload, "late_after_retry": attempt}, None, {})
             _enqueue(conn, key, "overpayment", run_id, actor, None, amount,
                      {"note": f"attempt {attempt} succeeded after a retry was sent; recover {amount}"})  # fmt: skip
             return
+        amount = payload.get("amount", row["amount_paid"] if row is not None else None)
         conn.execute(
-            "UPDATE payments SET status='sent', ts=? WHERE vendor=? AND invoice_number=? AND revision=?",
-            (now(), *key),
+            "UPDATE payments SET status='sent', ts=?, amount_paid=?, attempt=?"
+            " WHERE vendor=? AND invoice_number=? AND revision=?",
+            (now(), str(amount), attempt, *key),
         )
         _close_items(conn, key, UNCONFIRMED_REASON, "payment confirmed")
         if row is not None and row["status"] == "cancelled":
@@ -352,11 +355,18 @@ def withdraw_inbox(conn: sqlite3.Connection, key: InvoiceKey, inbox_ids: list[in
 
 
 def resolve_inbox(
-    conn: sqlite3.Connection, inbox_id: int, key: InvoiceKey, *, reviewer: str, run_id: str, decision: dict[str, Any]
+    conn: sqlite3.Connection,
+    inbox_id: int,
+    key: InvoiceKey,
+    *,
+    reviewer: str,
+    run_id: str,
+    decision: dict[str, Any],
+    status: Status | None = None,
 ) -> None:
-    """Record a person's decision and close the inbox item, in one transaction."""
+    """Record a person's decision and close the inbox item (and optionally set the status), in one transaction."""
     with conn:
-        _record(conn, key, EventType.HUMAN_DECISION, reviewer, run_id, decision, None, {})
+        _record(conn, key, EventType.HUMAN_DECISION, reviewer, run_id, decision, status, {})
         conn.execute(
             "UPDATE inbox SET status='resolved', resolved_ts=?, note=? WHERE id=?", (now(), decision["note"], inbox_id)
         )

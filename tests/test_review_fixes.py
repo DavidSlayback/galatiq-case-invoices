@@ -146,3 +146,23 @@ def test_r14_a_late_success_after_the_retry_is_recorded_as_an_overpayment(conn: 
     assert sent == [Decimal(100), Decimal(100)]
     assert ledger.already_paid(conn, key.vendor, key.invoice_number) == Decimal(200)  # the ledger tells the truth
     assert [i.reason for i in inbox.list_open(conn)] == ["overpayment"]
+    out = inbox.resolve(conn, "INV-9", approve=True, note="vendor refunding 100", reviewer="human:t", bank=ok)
+    assert out == {"status": "recovery_recorded", "amount": "100"} and sent == [Decimal(100), Decimal(100)]
+    assert db.invoice_row(conn, key.vendor, key.invoice_number)["status"] == "paid"  # pyright: ignore[reportOptionalSubscript]
+
+
+def test_r15_a_late_success_after_a_declined_retry_is_not_an_overpayment(conn: sqlite3.Connection):
+    key = InvoiceKey("Widgets Inc.", "INV-10", 0)
+    db.record(conn, key, EventType.RECEIVED, actor="t", run_id="r", status=Status.RECEIVED, total="100")
+
+    def slow_bank(vendor: str, amount: Decimal) -> dict[str, str]:
+        age_pending(conn)
+        inbox.list_open(conn)
+        inbox.resolve(conn, "INV-10", approve=False, note="not there", reviewer="human:t")
+        inbox.resolve(conn, "INV-10", approve=True, note="retry", reviewer="human:t", bank=declined)
+        return {"status": "success"}  # attempt 1 lands; attempt 2 was declined, so this is the only send
+
+    payment.pay(conn, key, Decimal(100), "USD", None, "r1", slow_bank)
+    assert db.payment_state(conn, key) == ("sent", Decimal(100))
+    assert ledger.already_paid(conn, key.vendor, key.invoice_number) == Decimal(100)
+    assert inbox.list_open(conn) == []  # no false clawback, no stale retry
