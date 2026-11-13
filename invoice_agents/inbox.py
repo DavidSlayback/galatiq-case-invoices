@@ -138,9 +138,10 @@ def resolve(
         raise InboxError("cannot approve: nothing usable was extracted; reject it or reprocess the file")
     run_id = new_run_id()
     decision = {"kind": "approve" if approve else "reject", "note": note, "inbox_id": r["id"], "reason": r["reason"]}
-    db.record(conn, key, EventType.HUMAN_DECISION, actor=reviewer, run_id=run_id, payload=decision)
-    with conn:
-        conn.execute("UPDATE inbox SET status='resolved', resolved_ts=?, note=? WHERE id=?", (db.now(), note, r["id"]))
+    db.resolve_inbox(conn, r["id"], key, reviewer=reviewer, run_id=run_id, decision=decision)
+    if r["reason"] == payment.UNCONFIRMED:  # approve = seen at the bank; reject = not there, retry from the inbox
+        res = (payment.confirm_pending if approve else payment.cancel_pending)(conn, key, run_id, reviewer)
+        return {"status": res.status.value, "amount": str(res.amount)}
     if not approve:
         db.record(
             conn, key, EventType.REJECTED, actor=reviewer, run_id=run_id,

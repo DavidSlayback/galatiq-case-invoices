@@ -15,7 +15,7 @@ The interface choices below were made by the agent while implementing, as the sk
 ## Status
 
 - [x] 1 identity: D40. 1012 is now keyed and paid under FastShip Ltd. (its registered name); gate and eval 27/27 pass; the `NOCASE` mutation fails 2 tests.
-- [ ] 2 store transitions
+- [x] 2 store transitions: D41. Crash, rollback and migration tests; writing the pending row after the bank call fails 4 tests; gate and eval 27/27 pass.
 - [ ] 3 settlement
 - [ ] 4 graph policy
 - [ ] 5 adapters
