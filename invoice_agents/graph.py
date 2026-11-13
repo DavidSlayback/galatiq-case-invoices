@@ -31,6 +31,7 @@ from invoice_agents.models import (
     Status,
 )
 from invoice_agents.normalize import NormalizeError
+from invoice_agents.payment import Bank, mock_payment
 from invoice_agents.settings import Settings
 from invoice_agents.trace import Tracer, new_run_id
 
@@ -44,6 +45,7 @@ class Deps:
     conn: sqlite3.Connection
     settings: Settings
     tracer: Tracer
+    bank: Bank = mock_payment
 
 
 @dataclass
@@ -284,7 +286,7 @@ async def settle_step(ctx: StepContext[State, Deps, AutoApprove | Approve | Reje
         decision = r.decision or Decision(kind=("approve" if isinstance(r, Approve) else "reject"), actor="rules")
     done = settle.settle(
         ctx.deps.conn, st.key, decision, findings=r.findings, total=r.invoice.total, currency=r.invoice.currency,
-        usd_total=r.usd_total, run_id=st.run_id,
+        usd_total=r.usd_total, run_id=st.run_id, bank=ctx.deps.bank,
     )  # fmt: skip
     return Outcome(key=st.key, status=done.status, decision=done.decision, findings=r.findings, run_id=st.run_id,
                    amount_paid=done.amount_paid, invoice=r.invoice)  # fmt: skip
@@ -376,18 +378,22 @@ g.add(
 graph = g.build()
 
 
-async def process(path: Path, settings: Settings, conn: sqlite3.Connection, run_id: str | None = None) -> Outcome:
-    """Run one file through the whole graph."""
+async def process(
+    path: Path, settings: Settings, conn: sqlite3.Connection, run_id: str | None = None, bank: Bank = mock_payment
+) -> Outcome:
+    """Run one file through the whole graph; ``bank`` is the payment adapter."""
     run_id = run_id or new_run_id()
     state = State(path=path, run_id=run_id)
-    deps = Deps(conn, settings, Tracer(settings.runs_dir, run_id))
+    deps = Deps(conn, settings, Tracer(settings.runs_dir, run_id), bank)
     outcome = await graph.run(state=state, deps=deps, inputs=path)
     return outcome.model_copy(update={"source_path": str(path)})
 
 
-def process_sync(path: Path, settings: Settings, conn: sqlite3.Connection, run_id: str | None = None) -> Outcome:
+def process_sync(
+    path: Path, settings: Settings, conn: sqlite3.Connection, run_id: str | None = None, bank: Bank = mock_payment
+) -> Outcome:
     """Synchronous wrapper for the CLI and Streamlit."""
-    return asyncio.run(process(path, settings, conn, run_id))
+    return asyncio.run(process(path, settings, conn, run_id, bank))
 
 
 def mermaid() -> str:

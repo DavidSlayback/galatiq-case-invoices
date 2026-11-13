@@ -41,7 +41,7 @@ def resolve(settings: Settings, kind: str, doc: RawDocument, attempt: int = 0) -
     bridge. Anything else is passed to PydanticAI as a model string.
     """
     if is_offline(settings):
-        g = golden(kind, doc.file_sha256, doc.path)
+        g = golden(kind, doc.file_sha256, doc.path, settings.golden_dir)
         answers = g.get("attempts") or [g["output"]]
         return replay_model(answers[min(attempt, len(answers) - 1)], name=f"offline:{kind}")
     assert settings.model is not None
