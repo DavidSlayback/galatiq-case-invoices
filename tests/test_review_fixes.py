@@ -183,6 +183,15 @@ def test_r16_a_late_success_while_the_retry_is_pending_then_declined_is_the_only
     assert inbox.list_open(conn) == []  # no false clawback, no stale retry
 
 
+def test_r17_a_skipped_rerun_does_not_postpone_recovery(conn: sqlite3.Connection, offline: Settings):
+    """Re-running a file inside the bound is a duplicate, and must not restart the 30-minute clock."""
+    graph.process_sync(INVOICES / "invoice_1004.json", offline, conn)
+    with conn:
+        conn.execute("UPDATE invoices SET updated_at='2026-01-01T00:00:00.000+00:00'")
+    graph.process_sync(INVOICES / "invoice_1004.json", offline, conn)  # duplicate: RECEIVED + DUPLICATE_SKIPPED
+    assert conn.execute("SELECT updated_at FROM invoices").fetchone()[0] == "2026-01-01T00:00:00.000+00:00"
+
+
 def test_r17_an_invoice_a_crash_left_after_its_decision_is_resumed_by_a_rerun(
     conn: sqlite3.Connection, offline: Settings, monkeypatch: pytest.MonkeyPatch
 ):
@@ -232,3 +241,64 @@ def test_r19_a_recent_unfinished_invoice_is_left_to_its_live_run(conn: sqlite3.C
         conn.execute("UPDATE invoices SET status='validated', updated_at=?", (db.now(),))
         conn.execute("DELETE FROM payments")
     assert graph.process_sync(INVOICES / "invoice_1004.json", offline, conn).status == Status.DUPLICATE_SKIPPED
+
+
+def test_r20_a_human_decision_a_crash_left_unsettled_goes_back_to_the_person(
+    conn: sqlite3.Connection, offline: Settings, monkeypatch: pytest.MonkeyPatch
+):
+    """A person rejects, the process dies before REJECTED: a re-run must never re-judge (and maybe pay) it."""
+    from invoice_agents import approval, settle
+
+    def escalate(inv: object, f: object, usd: object, due: object = None) -> object:
+        return approval.HumanReview(inv, f, usd, reason="held")  # type: ignore[arg-type]
+
+    monkeypatch.setattr(approval, "route", escalate)
+    graph.process_sync(INVOICES / "invoice_1004.json", offline, conn)
+    monkeypatch.undo()
+    (item,) = inbox.list_open(conn)
+
+    def dies(*_: object, **__: object) -> None:
+        raise Crash
+
+    monkeypatch.setattr(settle, "settle", dies)
+    with pytest.raises(Crash):
+        inbox.resolve(conn, "INV-1004", approve=False, note="fake vendor", reviewer="human:t", inbox_id=item.id)
+    monkeypatch.undo()
+    with conn:
+        conn.execute("UPDATE invoices SET updated_at='2000-01-01T00:00:00'")
+    again = graph.process_sync(INVOICES / "invoice_1004.json", offline, conn)
+    assert again.status == Status.DUPLICATE_SKIPPED and db.payment_state(conn, item.key) is None
+    (back,) = inbox.list_open(conn)
+    assert back.reason == "decision_unsettled"
+    assert inbox.resolve(conn, "INV-1004", approve=False, note="still fake", reviewer="human:t") == {
+        "status": "rejected"
+    }
+
+
+def test_r21_a_quick_rerun_does_not_hide_an_unsettled_human_decision(
+    conn: sqlite3.Connection, offline: Settings, monkeypatch: pytest.MonkeyPatch
+):
+    """A re-run inside the sweep window writes received + duplicate_skipped after the person's decision."""
+    from invoice_agents import approval, settle
+
+    def escalate(inv: object, f: object, usd: object, due: object = None) -> object:
+        return approval.HumanReview(inv, f, usd, reason="held")  # type: ignore[arg-type]
+
+    monkeypatch.setattr(approval, "route", escalate)
+    graph.process_sync(INVOICES / "invoice_1004.json", offline, conn)
+    monkeypatch.undo()
+    (item,) = inbox.list_open(conn)
+
+    def dies(*_: object, **__: object) -> None:
+        raise Crash
+
+    monkeypatch.setattr(settle, "settle", dies)
+    with pytest.raises(Crash):
+        inbox.resolve(conn, "INV-1004", approve=False, note="fake vendor", reviewer="human:t", inbox_id=item.id)
+    monkeypatch.undo()
+    graph.process_sync(INVOICES / "invoice_1004.json", offline, conn)  # right away: skipped as a duplicate
+    with conn:
+        conn.execute("UPDATE invoices SET updated_at='2000-01-01T00:00:00'")
+    assert [i.reason for i in inbox.list_open(conn)] == ["decision_unsettled"]
+    graph.process_sync(INVOICES / "invoice_1004.json", offline, conn)
+    assert db.payment_state(conn, item.key) is None  # never paid what a person rejected

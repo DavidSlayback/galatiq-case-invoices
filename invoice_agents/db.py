@@ -56,6 +56,11 @@ CREATE TABLE IF NOT EXISTS inbox (
     vendor TEXT NOT NULL COLLATE FOLD, invoice_number TEXT NOT NULL COLLATE FOLD,
     revision INTEGER NOT NULL, reason TEXT NOT NULL, label TEXT, status TEXT NOT NULL DEFAULT 'open',
     created_ts TEXT NOT NULL, resolved_ts TEXT, note TEXT, amount_due TEXT);
+-- Per-invoice lookups. Number first, so one index serves both "number" and "vendor + number";
+-- without them every lookup scans the table through the Python FOLD callback.
+CREATE INDEX IF NOT EXISTS invoice_events_key ON invoice_events (invoice_number, vendor);
+CREATE INDEX IF NOT EXISTS findings_key ON findings (invoice_number, vendor);
+CREATE INDEX IF NOT EXISTS inbox_key ON inbox (invoice_number, vendor);
 """
 
 UNCONFIRMED_REASON = "payment_unconfirmed"  # inbox reason: a bank call whose outcome nobody saw
@@ -67,9 +72,14 @@ UNCONFIRMED_REASON = "payment_unconfirmed"  # inbox reason: a bank call whose ou
 STALE_AFTER = timedelta(minutes=2)
 
 
+def cutoff(older_than: timedelta) -> str:
+    """The :func:`now`-format timestamp ``older_than`` ago; anything at or before it is stale."""
+    return (datetime.now(UTC) - older_than).isoformat(timespec="milliseconds")
+
+
 def is_stale(ts: str, older_than: timedelta = STALE_AFTER) -> bool:
     """Whether an ISO timestamp written by :func:`now` is older than ``older_than``."""
-    return ts <= (datetime.now(UTC) - older_than).isoformat(timespec="milliseconds")
+    return ts <= cutoff(older_than)
 
 
 def now() -> str:
@@ -162,7 +172,11 @@ def _record(
         " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
         (ts, run_id, key.vendor, key.invoice_number, key.revision, event, actor, json_dumps(payload or {})),
     )
-    if status is None:  # still a sign of life: run recovery (D46) judges staleness by this column
+    if status is None:
+        # A sign of life: run recovery (D46) judges staleness by this column. A skipped copy is
+        # not the invoice's run, so re-running the file does not postpone its recovery.
+        if event in (EventType.RECEIVED, EventType.DUPLICATE_SKIPPED):
+            return
         conn.execute(
             "UPDATE invoices SET updated_at=? WHERE vendor=? AND invoice_number=?", (ts, key.vendor, key.invoice_number)
         )

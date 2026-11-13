@@ -65,7 +65,7 @@ class State:
     model_name: str = ""
     review_brief: str = ""  # the case the VP and critic both read, built once in round 0
     mismatches: list[str] = field(default_factory=list[str])
-    amount_due: Decimal | None = None  # set when a revision arrives after the original was paid
+    amount_due: Decimal | None = None  # set when something was already paid on this invoice (A8, D46)
     vp_history: list[ModelMessage] = field(default_factory=list[ModelMessage])
 
 
@@ -390,6 +390,7 @@ async def process(
     """
     run_id = run_id or new_run_id()
     payment.sweep_unconfirmed(conn, run_id)
+    ledger.sweep_unsettled_decisions(conn, run_id)
     state = State(path=path, run_id=run_id)
     deps = Deps(conn, settings, Tracer(settings.runs_dir, run_id), bank)
     outcome = await graph.run(state=state, deps=deps, inputs=path)

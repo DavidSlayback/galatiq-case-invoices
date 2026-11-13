@@ -122,6 +122,8 @@ def _interrupted(conn: sqlite3.Connection, key: InvoiceKey, row: sqlite3.Row) ->
     """
     if row["status"] not in _IN_FLIGHT or not db.is_stale(row["updated_at"], RUN_STALE_AFTER):
         return False
+    if _last_event(conn, key) == "human_decision":  # a person decided: never re-judge (sweep_unsettled_decisions)
+        return False
     open_item = conn.execute(
         "SELECT 1 FROM inbox WHERE vendor=? AND invoice_number=? AND status='open'", (key.vendor, key.invoice_number)
     ).fetchone()
@@ -206,7 +208,8 @@ class Intake:
         verdict: Name of the ledger check result, for the trace.
         skipped: Why the invoice is not processed further (duplicate or stale), else ``None``.
         findings: Findings the ledger raises (STALE_REVISION, DUPLICATE_NUMBER_CONFLICT).
-        amount_due: For a revision of a paid invoice, what is still owed; else ``None``.
+        amount_due: What is still owed when anything was already paid on this invoice (an earlier
+            revision, a conflict copy, or this revision before a crash, D46); else ``None``.
     """
 
     key: InvoiceKey
@@ -281,3 +284,53 @@ def intake(
     db.record(conn, key, EventType.EXTRACTED, actor="extractor", run_id=run_id, payload=extracted,
               status=Status.EXTRACTED)  # fmt: skip
     return Intake(key, verdict, findings=findings, amount_due=amount_due)
+
+
+# Events a skipped re-run writes: they record that a copy arrived, not a step of the invoice's
+# own run, so they must never hide the step a crash cut short.
+_ARRIVALS = "('received', 'duplicate_skipped')"
+
+
+def _last_event(conn: sqlite3.Connection, key: InvoiceKey) -> str | None:
+    """The invoice's latest event, ignoring arrivals of copies."""
+    row = conn.execute(
+        "SELECT event FROM invoice_events WHERE vendor=? AND invoice_number=?"
+        f" AND event NOT IN {_ARRIVALS} ORDER BY id DESC LIMIT 1",
+        (key.vendor, key.invoice_number),
+    ).fetchone()
+    return None if row is None else row[0]
+
+
+UNSETTLED = "decision_unsettled"
+
+
+def sweep_unsettled_decisions(conn: sqlite3.Connection, run_id: str) -> int:
+    """Put back in the inbox any human decision a dead process recorded but never carried out (D46).
+
+    A decision is written (and its inbox item closed) before settlement runs, so a crash in
+    between leaves the invoice escalated with nothing open. Re-judging it would risk paying
+    what a person rejected, so the run-recovery path skips it and this sweep asks the person
+    again, quoting the earlier decision. A pending payment is the payment sweep's job instead.
+
+    Returns:
+        How many invoices were queued.
+    """
+    rows = conn.execute(
+        "SELECT i.vendor, i.invoice_number, i.revision, e.payload FROM invoices i"
+        " JOIN invoice_events e ON e.id = (SELECT max(id) FROM invoice_events"
+        f"   WHERE vendor=i.vendor AND invoice_number=i.invoice_number AND event NOT IN {_ARRIVALS})"
+        " WHERE i.status='escalated' AND e.event='human_decision' AND i.updated_at<=?"
+        " AND NOT EXISTS (SELECT 1 FROM inbox WHERE vendor=i.vendor AND invoice_number=i.invoice_number"
+        "   AND status='open')"
+        " AND NOT EXISTS (SELECT 1 FROM payments WHERE vendor=i.vendor AND invoice_number=i.invoice_number"
+        "   AND revision=i.revision AND status='pending')",
+        (db.cutoff(db.STALE_AFTER),),
+    ).fetchall()
+    for r in rows:
+        earlier = json.loads(r[3])
+        db.enqueue_inbox(
+            conn, InvoiceKey(r[0], r[1], r[2]), reason=UNSETTLED, run_id=run_id, actor="ledger",
+            payload={"earlier_decision": earlier.get("kind"), "earlier_note": earlier.get("note"),
+                     "note": "a recorded decision was never carried out; decide again"},
+        )  # fmt: skip
+    return len(rows)
