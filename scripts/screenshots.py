@@ -59,13 +59,19 @@ def main() -> None:
                         time.sleep(1)
                 wait_ready(page)
                 page.get_by_role("button", name="Process").click()
-                page.wait_for_selector("text=Read the file", timeout=60_000)  # the stage list renders last
+                page.wait_for_selector("text=How the agents decided", timeout=60_000)  # the conversation renders last
                 wait_ready(page)
                 time.sleep(3)  # data grids paint on a canvas after the script finishes
                 page.screenshot(path=OUT / "process.png", full_page=True)
+                # 1010 goes through the VP and critic, so its history shows the agents' conversation.
+                subprocess.run([sys.executable, "main.py", "--invoice_path=data/invoices/invoice_1010.txt"],
+                               env=env, cwd=ROOT, capture_output=True, check=True)  # fmt: skip
                 for path, name in [("inbox", "inbox"), ("history", "history"), ("roi", "roi")]:
                     page.goto(f"{base}/{path}")
                     wait_ready(page)
+                    if path == "history":  # INV-1010 sorts first; open its conversation
+                        page.get_by_text("How the agents decided").first.click()
+                        wait_ready(page)
                     time.sleep(3)
                     page.screenshot(path=OUT / f"{name}.png", full_page=True)
                 page.goto(f"{base}/batch")

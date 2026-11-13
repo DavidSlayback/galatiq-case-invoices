@@ -136,6 +136,7 @@ class EventType(StrEnum):
     PAYMENT_FAILED = "payment_failed"
     REVISION_AFTER_PAYMENT = "revision_after_payment"
     REJECTED = "rejected"
+    VENDOR_MASTER_UPDATED = "vendor_master_updated"
 
 
 class InvoiceKey(NamedTuple):

@@ -9,7 +9,7 @@ Acme loses **$2M a year** processing invoices by hand: a 30% error rate and a 5-
 | Handled with no person | 0% | **78%**, on a test set deliberately full of problems |
 | Model cost per invoice | — | **~4.6¢** (Grok 4.7 at published API prices) |
 
-The case brief is in [docs/BRIEF.md](docs/BRIEF.md). A 2½-minute narrated demo is in [docs/demo/demo.mp4](docs/demo/demo.mp4) (synthetic voice; every screen is real command output). The presentation is a one-page walkthrough of the architecture, decisions and results: [Acme Invoice Agents explainer](https://claude.ai/artifact/Uk4Fdc3Wff3zQPaVSpUghN) (updated 2026-11-13 for commit f1e56a4).
+The case brief is in [docs/BRIEF.md](docs/BRIEF.md). A 3-minute narrated demo is in [docs/demo/demo.mp4](docs/demo/demo.mp4) (synthetic voice; every screen is real command output). The presentation is a one-page walkthrough of the architecture, decisions and results: [Acme Invoice Agents explainer](https://claude.ai/artifact/Uk4Fdc3Wff3zQPaVSpUghN) (updated 2026-11-13 for commit f1e56a4).
 
 ## Quickstart
 
@@ -21,6 +21,13 @@ uv run python main.py eval                                           # score all
 uv run python main.py review                                         # the human inbox (approve or reject with a note)
 uv run python main.py history INV-1004                               # the event ledger for one invoice
 uv run python main.py ui                                             # dashboard at http://localhost:8501
+```
+
+**The system learns from people.** 1012 comes from "QuickShip", a known alias of FastShip, so it goes to a person. If the reviewer approves and confirms the rename with the vendor, the registry records it, and the next QuickShip invoice goes straight through:
+
+```bash
+uv run python main.py review INV-1012 --approve --update-vendor --note "Called FastShip: QuickShip is their new name"
+uv run python main.py --invoice_path=data/followup/invoice_1020.txt  # paid, no findings
 ```
 
 No API key or login is needed. With nothing configured, the system replays recorded model answers (offline mode). Live backends are picked automatically, in this order, or set with `--model`:
@@ -118,6 +125,8 @@ Every decision, its reason, and whether David or the agent made it is in [docs/D
 - **No partial payment (D4).** An invoice with any bad line is rejected whole, and the notice names the line.
 - **Tiers (D7):** hard → reject; fraud or more than $50K → person; $10K–$50K or a soft flag → VP and critic; otherwise automatic.
 - **Vendor-master changes go to a person (D33).** Both live models approved the renamed vendor; who gets paid is not a model's call.
+- **People's decisions teach the registry (D50).** A reviewer who verified a rename or new bank details with the vendor can record it while approving. The change is logged with their note, and the vendor's next invoice is not flagged for it again. Look-alike names can never be learned this way.
+- **The agents' reasoning is readable (D51).** The Process and History pages show each run as a conversation: the extractor reading the file, the code's checks, the VP's proposal and lookups, and the critic's verdict.
 - **Models (D31, D32):** any PydanticAI provider, or Grok and Claude through their CLIs on existing subscriptions, with offline replay as the fallback.
 
 ## Limitations and next steps

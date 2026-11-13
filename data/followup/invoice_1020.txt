@@ -1,0 +1,24 @@
+                    I N V O I C E
+
+  FROM:  QuickShip Distributers
+
+  INV NO:    INV 1020
+  DATE:      28-Jan-2026
+  DUE:       27-Feb-2026
+
+  TO:    ACME Corp
+         Attn: Accounts Payable
+
+  ----------------------------------------
+  ITEM          QTY    PRICE     TOTAL
+  ----------------------------------------
+  Widget A        2    $250       $500.00
+  WidgetB         1    $500       $500.00
+  ----------------------------------------
+                  SUBTOTAL:     $1,000.00
+                  TAX (5%):        $50.00
+                  TOTAL:        $1,050.00
+
+  NOTES: Ref PO-20260120. Restock order.
+
+  Terms: Net 30

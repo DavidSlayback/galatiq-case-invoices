@@ -40,7 +40,7 @@ def seed(conn: sqlite3.Connection) -> None:
     with conn:
         conn.executemany("INSERT OR REPLACE INTO inventory VALUES (?, ?, ?)", INVENTORY)
         conn.executemany(
-            "INSERT OR REPLACE INTO vendors VALUES (?, ?, 1, ?, ?)",
+            "INSERT OR REPLACE INTO vendors (name, address, known, aliases_json, bank_ref) VALUES (?, ?, 1, ?, ?)",
             [(n, a, json.dumps(al), b) for n, a, al, b in VENDORS],
         )
         conn.executemany("INSERT OR REPLACE INTO fx_rates VALUES (?, ?, ?, ?)", FX_RATES)

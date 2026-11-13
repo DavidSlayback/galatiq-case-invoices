@@ -1,10 +1,8 @@
 """Event timeline and agent traces for one invoice."""
 
-import json
-
 import streamlit as st
 
-from app.common import conn, settings, trace
+from app.common import conn, conversation, settings, trace
 
 s = settings()
 c = conn(s)
@@ -34,6 +32,7 @@ st.dataframe(
 for run_id in dict.fromkeys(r["run_id"] for r in rows):
     lines = trace(s, run_id)
     if lines:
-        with st.expander(f"Agent trace for run {run_id} ({len(lines)} steps)"):
-            for t in lines:
-                st.code(json.dumps(t, default=str)[:600], language="json")
+        with st.expander(f"How the agents decided, run {run_id}"):
+            conversation(lines)
+            st.caption("Raw trace")
+            st.json(lines, expanded=False)

@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any
 
-from invoice_agents import approval, db, fx, identity, ledger, payment, settle
+from invoice_agents import approval, db, fx, identity, ledger, payment, settle, vendors
 from invoice_agents.models import Decision, Finding, InvoiceKey, Status
 from invoice_agents.trace import new_run_id
 
@@ -120,6 +120,7 @@ def resolve(
     vendor: str | None = None,
     inbox_id: int | None = None,
     bank: payment.Bank = payment.mock_payment,
+    update_vendor: bool = False,
 ) -> dict[str, Any]:
     """Decide one open inbox item; what approve means depends on the item's reason.
 
@@ -140,6 +141,8 @@ def resolve(
         vendor: Disambiguates when two vendors use the same invoice number.
         inbox_id: The exact inbox item (the dashboard passes this).
         bank: Payment adapter.
+        update_vendor: With an approval, also apply the vendor-master changes the findings
+            offer (a confirmed new name, new bank details), as verified by the reviewer (D50).
 
     Returns:
         ``{"status": ...}`` plus ``"amount"`` (attempted or recovered) unless the invoice was rejected.
@@ -171,7 +174,14 @@ def resolve(
         raise InboxError(f"cannot approve: hard findings {', '.join(hard)}")
     if approve and (inv is None or inv["total"] is None):
         raise InboxError("cannot approve: nothing usable was extracted; reject it or reprocess the file")
+    changes = vendors.master_changes(findings, key.vendor) if update_vendor else []
+    if update_vendor and not approve:
+        raise InboxError("the vendor record is updated only with an approval")
+    if update_vendor and not changes:
+        raise InboxError("this invoice proposes no vendor-record change (only a rename or new bank details do)")
     db.resolve_inbox(conn, r["id"], key, reviewer=reviewer, run_id=run_id, decision=decision)
+    for change in changes:  # verified out of band by the reviewer; the next invoice matches without a flag
+        db.update_vendor_master(conn, key, change, actor=reviewer, run_id=run_id, note=note)
     total = Decimal(inv["total"]) if inv and inv["total"] is not None else None
     currency = (inv["currency"] if inv else None) or "USD"
     done = settle.settle(

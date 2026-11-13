@@ -5,6 +5,7 @@ human, ``note`` is informational (D7, D10). The rule table is documented in
 docs/RULES.md.
 """
 
+import json
 import re
 import sqlite3
 from collections import defaultdict
@@ -43,7 +44,12 @@ class Reference:
     def load(cls, conn: sqlite3.Connection) -> Reference:
         """Read inventory, vendors and FX rates."""
         inv = conn.execute("SELECT item, stock, unit_price FROM inventory").fetchall()
-        known = {identity.fold(r["name"]): dict(r) for r in conn.execute("SELECT * FROM vendors")}
+        # A name a person confirmed (D50) matches exactly: no rename flag, and the bank check applies to it.
+        known = {
+            identity.fold(n): dict(r)
+            for r in conn.execute("SELECT * FROM vendors")
+            for n in (r["name"], *json.loads(r["confirmed_names_json"]))
+        }
         return cls(
             stock={r["item"]: r["stock"] for r in inv},
             price={r["item"]: Decimal(r["unit_price"]) for r in inv},

@@ -62,8 +62,8 @@ def registry(conn: sqlite3.Connection) -> dict[str, str]:
         ValueError: One name or alias belongs to two vendors; paying either would be a guess.
     """
     out: dict[str, str] = {}
-    for r in conn.execute("SELECT name, aliases_json FROM vendors ORDER BY name").fetchall():
-        for n in (r["name"], *json.loads(r["aliases_json"])):
+    for r in conn.execute("SELECT name, aliases_json, confirmed_names_json FROM vendors ORDER BY name").fetchall():
+        for n in (r["name"], *json.loads(r["aliases_json"]), *json.loads(r["confirmed_names_json"])):
             if out.setdefault(fold(n), r["name"]) != r["name"]:
                 raise ValueError(f"vendor registry: {n!r} names both {out[fold(n)]!r} and {r['name']!r}")
     return out

@@ -12,7 +12,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent, RunContext
-from pydantic_ai.messages import ModelMessage, ToolCallPart
+from pydantic_ai.messages import ModelMessage, ToolCallPart, ToolReturnPart
 from pydantic_ai.usage import UsageLimits
 
 from invoice_agents import lookups
@@ -123,11 +123,12 @@ class Review[T]:
 
 
 def _tool_calls(messages: list[ModelMessage], output_tools: set[str]) -> list[dict[str, Any]]:
-    """The function-tool calls in a run (output-tool calls are the answer, not a lookup)."""
+    """The function-tool calls in a run, each with what the tool returned (output-tool calls are the answer)."""
+    parts = [p for m in messages for p in getattr(m, "parts", [])]
+    results = {p.tool_call_id: p.content for p in parts if isinstance(p, ToolReturnPart)}
     return [
-        {"tool": p.tool_name, "args": p.args_as_dict()}
-        for m in messages
-        for p in getattr(m, "parts", [])
+        {"tool": p.tool_name, "args": p.args_as_dict(), "result": results.get(p.tool_call_id)}
+        for p in parts
         if isinstance(p, ToolCallPart) and p.tool_name not in output_tools
     ]
 
