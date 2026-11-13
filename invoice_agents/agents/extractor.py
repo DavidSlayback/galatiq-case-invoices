@@ -61,7 +61,14 @@ def prompt(doc: RawDocument, feedback: str | None) -> str:
     parts = [f"Format: {doc.format}"]
     if doc.fields:
         parts.append(f"Fields a parser read directly (may be partial):\n{json.dumps(doc.fields, default=str)}")
-    if doc.text.strip():
+    if doc.text.strip() and doc.page_images:
+        # Live runs showed Tesseract dropping a table's quantity column; the images are the source of truth.
+        parts.append(
+            "The document is a scan. Below is local OCR text as a hint: it can scramble or drop table columns."
+            " Read every value from the attached page images; use the OCR text only to help read them.\n"
+            f"<ocr>\n{doc.text}\n</ocr>"
+        )
+    elif doc.text.strip():
         parts.append(f"<document>\n{doc.text}\n</document>")
     else:
         parts.append("The document is a scanned image with no text layer; read it from the attached page images.")
@@ -88,8 +95,8 @@ async def extract(
     """
     model: Model | str = resolve(settings, "extract", doc, attempt)
     user: str | list[UserContent] = prompt(doc, feedback)
-    if doc.page_images and not doc.text.strip():
-        # A scan with no trusted OCR text: the model reads the page images itself (D16).
+    if doc.page_images:
+        # A scan: the model reads the page images itself, with any OCR text as a hint (D16, D49).
         user = [user, *(BinaryContent(data=png, media_type="image/png") for png in doc.page_images)]
     result = await extractor.run(user, model=model, message_history=history or None)
     name = model if isinstance(model, str) else model.model_name

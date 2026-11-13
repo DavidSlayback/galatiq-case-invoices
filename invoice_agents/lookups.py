@@ -19,10 +19,13 @@ def vendor_history(conn: sqlite3.Connection, key: InvoiceKey) -> dict[str, Any]:
     """Acme's record with this invoice's vendor, excluding the invoice under review.
 
     Returns:
-        ``invoices_on_file`` (count by status), ``total_paid`` (sum of sent payments, by
-        currency), ``recent`` (the latest invoices: number, status, total, currency) and
-        ``open_review_items`` (inbox items still waiting on a person). A vendor never seen
-        before returns zero counts, which is itself a signal.
+        ``in_registry`` (the payee is a registered vendor; the ledger key already resolves
+        exact names and aliases, so this is the identity check), ``invoices_on_file`` (count by
+        status), ``total_paid`` (sum of sent payments, by currency), ``recent`` (the latest
+        invoices: number, status, total, currency) and ``open_review_items`` (inbox items still
+        waiting on a person). A registered vendor with no history is normal for its first
+        invoice; the ``note`` says so, because a live critic once read an empty history as an
+        unconfirmed payee.
     """
     others = "vendor=? AND invoice_number<>?"
     args = (key.vendor, key.invoice_number)
@@ -39,8 +42,15 @@ def vendor_history(conn: sqlite3.Connection, key: InvoiceKey) -> dict[str, Any]:
         (*args, RECENT),
     ).fetchall()
     open_items = conn.execute(f"SELECT count(*) FROM inbox WHERE {others} AND status='open'", args).fetchone()[0]
+    registered = conn.execute("SELECT 1 FROM vendors WHERE name=?", (key.vendor,)).fetchone() is not None
+    first = not by_status
     return {
         "vendor": key.vendor,
+        "in_registry": registered,
+        "note": (
+            ("Registered vendor" if registered else "NOT in the vendor registry")
+            + ("; no earlier invoices on file (normal for a first invoice)" if first else "")
+        ),
         "invoices_on_file": by_status,
         "total_paid": {c: str(a) for c, a in paid.items()},
         "recent": [dict(r) for r in recent],

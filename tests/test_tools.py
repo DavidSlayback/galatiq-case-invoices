@@ -40,6 +40,13 @@ def test_vendor_history_summarises_other_invoices_only(conn: sqlite3.Connection)
 def test_vendor_history_of_a_new_vendor_is_empty(conn: sqlite3.Connection):
     h = lookups.vendor_history(conn, InvoiceKey("Nobody Ltd.", "INV-1", 0))
     assert h["invoices_on_file"] == {} and h["recent"] == [] and h["open_review_items"] == 0
+    assert h["in_registry"] is False and h["note"].startswith("NOT in the vendor registry")
+
+
+def test_a_registered_vendor_with_no_history_says_so(conn: sqlite3.Connection):
+    """A live critic read an empty history as an unconfirmed payee; the tool now states registry status."""
+    h = lookups.vendor_history(conn, KEY)
+    assert h["in_registry"] is True and "normal for a first invoice" in h["note"]
 
 
 def test_catalog_item(conn: sqlite3.Connection):
