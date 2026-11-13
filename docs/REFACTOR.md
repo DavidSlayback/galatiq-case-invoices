@@ -1,0 +1,24 @@
+# Deepening refactor (2026-11-13)
+
+Source: the architecture review at https://claude.ai/artifact/FF6ru9BpNsAmBXkUeW6Drh. David picked candidates 1–5 ("1-5"; implement mode, so no grilling). They land as stacked PRs, one candidate each. Each PR must keep the gate (`scripts/check-all`) and the offline eval (27/27) green, and each is tested through the deepened module's interface.
+
+The interface choices below were made by the agent while implementing, as the skill's implement mode allows. Each is recorded with its reason.
+
+| # | Deepened module | Interface decision (agent) | Why |
+|---|---|---|---|
+| 1 | `identity.py`: invoice identity | One `fold` rule (NFKC, casefold, collapsed spaces), registered as SQLite collation `FOLD` on every table key column. `key_for` resolves an exact or alias vendor to its registered name; look-alikes are not resolved. Conflict copies are named and recognised only here. User-typed numbers go through `lookup_number`. | A collation makes every existing query fold identically, with no extra key columns to keep in sync. A look-alike must never inherit a real vendor's ledger. |
+| 2 | `db.py`: store transitions | Payments write a `pending` row before the bank call and settle it afterwards. Withdraw, findings and inbox-resolve each run in one transaction. A pending row found later is never re-sent; it goes to the inbox as `payment_unconfirmed`. | A crash after the bank call leaves evidence instead of a gap, and a human checks the bank. |
+| 3 | `settle.py`: settlement | `settle(conn, key, decision, ...)` applies the guardrail, writes DECIDED, and then pays or rejects (with the bad lines). The graph's `pay` and `reject` nodes become one `settle` node, and `inbox.resolve` calls the same function. | One policy and one audit trail, whoever decides. D19 is reworded to match. |
+| 4 | `ledger.intake`, `approval.route` | The ledger exposes a single intake operation that checks and records. `route` takes `amount_due`, so revision-after-payment routing lives in approval. `reconcile` builds ARITHMETIC_MISMATCH. | graph.py becomes wiring only. |
+| 5 | `Deps` adapters | The replay source directory is a Settings field, cached per directory. The bank is a field on `Deps`, and `process(..., bank=)` passes it through. | Tests swap adapters without patching module globals. |
+
+## Status
+
+- [x] 1 identity: D40. 1012 is now keyed and paid under FastShip Ltd. (its registered name); gate and eval 27/27 pass; the `NOCASE` mutation fails 2 tests.
+- [ ] 2 store transitions
+- [ ] 3 settlement
+- [ ] 4 graph policy
+- [ ] 5 adapters
+- [ ] Fresh-context review of the stack, then merge
+
+Existing databases keep their old `NOCASE` columns until `main.py reset` rebuilds them. `connect` adds the new `payments.status` column in place.

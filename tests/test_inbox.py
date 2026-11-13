@@ -20,7 +20,8 @@ def test_1012_approved_by_human_is_paid(conn: sqlite3.Connection, offline: Setti
         conn, "INV-1012", approve=True, note="Confirmed rename with FastShip by phone", reviewer="human:t"
     )
     assert res == {"status": "paid", "amount": "9975.00"}
-    evts = [e["event"] for e in db.events(conn, "QuickShip Distributers", "INV-1012")]
+    # The alias is keyed under the registered vendor, so the payment goes to FastShip's record.
+    evts = [e["event"] for e in db.events(conn, "FastShip Ltd.", "INV-1012")]
     assert evts[-2:] == ["human_decision", "paid"] and inbox.list_open(conn) == []
 
 

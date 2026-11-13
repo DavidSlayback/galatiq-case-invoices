@@ -4,10 +4,10 @@ Pure functions over the registry the rules already load, so the score is the
 same wherever it is shown (findings, VP brief, inbox).
 """
 
-import re
-import unicodedata
 from dataclasses import dataclass
 from typing import Literal
+
+from invoice_agents import identity
 
 Match = Literal["exact", "alias", "lookalike", "unknown", "missing"]
 
@@ -17,10 +17,7 @@ HIGH_RISK = 60
 LOOKALIKE_DISTANCE = 2
 
 
-def norm(name: str | None) -> str:
-    """Comparison form: NFKC (folds look-alike Unicode forms), lower case, single spaces."""
-    s = unicodedata.normalize("NFKC", name or "")
-    return re.sub(r"\s+", " ", s.strip().lower())
+norm = identity.fold  # the one comparison form for vendor names (D38)
 
 
 def distance(a: str, b: str) -> int:
@@ -47,7 +44,7 @@ def match(name: str | None, known: dict[str, str], aliases: dict[str, str]) -> V
     n = norm(name)
     if not n:
         return VendorMatch("missing")
-    plain = re.sub(r"\s+", " ", (name or "").strip().lower())
+    plain = " ".join((name or "").casefold().split())
     if n in known or n in aliases:
         # Equal only after NFKC folding (full-width or other look-alike code points): impersonation (B4).
         if plain != n:

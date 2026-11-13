@@ -16,10 +16,9 @@ from pydantic_ai.exceptions import UnexpectedModelBehavior
 from pydantic_ai.messages import ModelMessage
 from pydantic_graph import GraphBuilder, StepContext
 
-from invoice_agents import approval, db, fx, ledger, payment, reconcile, rules
+from invoice_agents import approval, db, fx, identity, ledger, payment, reconcile, rules
 from invoice_agents.agents import extractor, reviewers
 from invoice_agents.approval import Approve, AutoApprove, HumanReview, Objected, Proposed, Reject, VpReview
-from invoice_agents.ledger import key_for
 from invoice_agents.loaders import LoadError, load
 from invoice_agents.models import (
     Decision,
@@ -179,7 +178,7 @@ async def reconcile_step(ctx: StepContext[State, Deps, Extracted]) -> Reconciled
             )
         )
     assert s.doc is not None
-    s.invoice, s.key, s.mismatches = inv, key_for(inv, s.doc.file_sha256), problems
+    s.invoice, s.key, s.mismatches = inv, identity.key_for(ctx.deps.conn, inv, s.doc.file_sha256), problems
     return Reconciled(inv)
 
 
@@ -206,7 +205,7 @@ async def ledger_check(ctx: StepContext[State, Deps, Reconciled]) -> Reconciled 
         return DuplicateFound(inv, why)
     if isinstance(found, ledger.Conflict):
         # Keep the original's row intact: the conflicting copy gets its own ledger key.
-        s.key = s.key._replace(invoice_number=f"{s.key.invoice_number}{ledger.CONFLICT_SUFFIX}{s.doc.file_sha256[:8]})")
+        s.key = identity.conflict_key(s.key, s.doc.file_sha256)
         msg = f"same invoice number and revision as one on file, but {', '.join(found.fields)} differ"
         s.findings.append(Finding(rule_id="DUPLICATE_NUMBER_CONFLICT", severity="fraud", message=msg,
                                   evidence={"fields": found.fields}))  # fmt: skip

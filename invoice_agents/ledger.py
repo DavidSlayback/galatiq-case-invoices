@@ -8,22 +8,14 @@ and even in which optional fields they state (1011's PDF has no subtotal).
 
 import json
 import sqlite3
-import unicodedata
 from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Any
 
+from invoice_agents import identity
 from invoice_agents.models import Finding, Invoice, InvoiceKey
 
 CORE_FIELDS = ("vendor", "invoice_number", "revision", "invoice_date", "due_date", "total", "lines")
-
-
-def key_for(inv: Invoice, file_sha256: str) -> InvoiceKey:
-    """Ledger key for an extracted invoice; placeholders keep unidentifiable invoices distinct."""
-    # NFKC + collapsed spaces here, case-insensitive columns in the DB: "WIDGETS  INC." is Widgets Inc. (B1).
-    vendor = " ".join(unicodedata.normalize("NFKC", inv.vendor or "").split()) or "(missing vendor)"
-    number = (inv.invoice_number or "").strip() or f"(no number {file_sha256[:8]})"
-    return InvoiceKey(vendor, number, inv.revision)
 
 
 def core(inv: Invoice) -> dict[str, Any]:
@@ -151,18 +143,7 @@ def split_findings(conn: sqlite3.Connection, key: InvoiceKey, inv: Invoice, limi
     ]  # fmt: skip
 
 
-CONFLICT_SUFFIX = " (conflict "
-
-
-def base_number(invoice_number: str) -> str:
-    """The invoice number without the suffix a conflicting copy gets."""
-    return invoice_number.split(CONFLICT_SUFFIX)[0]
-
-
 def already_paid(conn: sqlite3.Connection, vendor: str, invoice_number: str) -> Decimal:
     """Total paid so far across every revision and copy of one invoice (B7: conflicts count too)."""
-    rows = conn.execute(
-        "SELECT amount_paid FROM payments WHERE vendor=? AND (invoice_number=? OR invoice_number LIKE ?)",
-        (vendor, base_number(invoice_number), base_number(invoice_number) + CONFLICT_SUFFIX + "%"),
-    ).fetchall()
-    return sum((Decimal(r[0]) for r in rows), Decimal(0))
+    rows = conn.execute("SELECT invoice_number, amount_paid FROM payments WHERE vendor=?", (vendor,)).fetchall()
+    return sum((Decimal(r[1]) for r in rows if identity.same_invoice(r[0], invoice_number)), Decimal(0))
