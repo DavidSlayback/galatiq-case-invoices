@@ -283,6 +283,12 @@ def settle_payment(
         ).fetchone()
         # A newer attempt that was cancelled never sent anything: this late success is the only send.
         if row is not None and row["attempt"] != attempt and row["status"] != "cancelled":
+            seen = conn.execute(
+                "SELECT 1 FROM overpayments WHERE vendor=? AND invoice_number=? AND revision=? AND attempt=?",
+                (*key, attempt),
+            ).fetchone()
+            if seen:  # this attempt's late success is already recorded
+                return
             amount = Decimal(str(payload.get("amount", row["amount_paid"])))
             conn.execute("INSERT INTO overpayments VALUES (?, ?, ?, ?, ?, ?)", (*key, attempt, str(amount), now()))
             _record(conn, key, EventType.PAID, actor, run_id, {**payload, "late_after_retry": attempt}, None, {})
@@ -326,6 +332,24 @@ def fail_payment(
         if cur.rowcount != 1:
             return
         _close_items(conn, key, UNCONFIRMED_REASON, "payment failed")
+        early = conn.execute(
+            "SELECT rowid, attempt, amount FROM overpayments WHERE vendor=? AND invoice_number=? AND revision=?"
+            " AND attempt<? ORDER BY attempt DESC LIMIT 1",
+            (*key, attempt),
+        ).fetchone()
+        if early is not None:  # an older attempt already landed: it was the only send, not an overpayment
+            conn.execute("DELETE FROM overpayments WHERE rowid=?", (early["rowid"],))
+            conn.execute(
+                "UPDATE payments SET status='sent', attempt=?, amount_paid=?"
+                " WHERE vendor=? AND invoice_number=? AND revision=?",
+                (early["attempt"], early["amount"], *key),
+            )
+            note = f"attempt {attempt} was declined, so attempt {early['attempt']} was the only send"
+            _close_items(conn, key, "overpayment", note)
+            _close_items(conn, key, "payment_failed", note)
+            _record(conn, key, EventType.PAYMENT_FAILED, actor, run_id,
+                    {**payload, "earlier_attempt_paid": early["attempt"]}, Status.PAID, {})  # fmt: skip
+            return
         _record(conn, key, EventType.PAYMENT_FAILED, actor, run_id, payload, Status.PAYMENT_FAILED, {})
         _enqueue(conn, key, "payment_failed", run_id, actor, None, amount, {"errors": payload.get("errors", [])})
 

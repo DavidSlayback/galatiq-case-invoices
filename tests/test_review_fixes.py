@@ -166,3 +166,21 @@ def test_r15_a_late_success_after_a_declined_retry_is_not_an_overpayment(conn: s
     assert db.payment_state(conn, key) == ("sent", Decimal(100))
     assert ledger.already_paid(conn, key.vendor, key.invoice_number) == Decimal(100)
     assert inbox.list_open(conn) == []  # no false clawback, no stale retry
+
+
+def test_r16_a_late_success_while_the_retry_is_pending_then_declined_is_the_only_send(conn: sqlite3.Connection):
+    key = InvoiceKey("Widgets Inc.", "INV-11", 0)
+    amt = {"amount": Decimal(100)}
+    first = db.start_payment(conn, key, Decimal(100), "USD", Decimal(100))
+    assert first == 1
+    db.fail_payment(conn, key, first, run_id="r", actor="human:t", amount=Decimal(100), payload=amt)
+    retry = db.start_payment(conn, key, Decimal(100), "USD", Decimal(100))
+    assert retry == 2
+    db.settle_payment(conn, key, first, run_id="r", actor="payment", payload=amt)  # attempt 1 lands late
+    db.settle_payment(conn, key, first, run_id="r", actor="payment", payload=amt)  # reported twice
+    assert sorted(i.reason for i in inbox.list_open(conn)) == ["overpayment", "payment_failed"]
+    assert ledger.already_paid(conn, key.vendor, key.invoice_number) == Decimal(200)  # pending retry + late send
+    db.fail_payment(conn, key, retry, run_id="r", actor="payment", amount=Decimal(100), payload=amt)
+    assert db.payment_state(conn, key) == ("sent", Decimal(100))
+    assert ledger.already_paid(conn, key.vendor, key.invoice_number) == Decimal(100)
+    assert inbox.list_open(conn) == []  # no false clawback, no stale retry
