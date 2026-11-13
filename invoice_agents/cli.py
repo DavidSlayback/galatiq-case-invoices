@@ -207,4 +207,7 @@ def reset(db: DbOpt = None) -> None:
 def ui() -> None:
     """Launch the Streamlit dashboard."""
     app_path = Path(__file__).resolve().parents[1] / "app" / "streamlit_app.py"
-    raise typer.Exit(subprocess.call([sys.executable, "-m", "streamlit", "run", str(app_path)]))
+    # Headless skips Streamlit's first-run email prompt, which would otherwise block until Enter.
+    args = ["--server.headless", "true", "--browser.gatherUsageStats", "false"]
+    console.print("Dashboard at http://localhost:8501 (Ctrl+C to stop).")
+    raise typer.Exit(subprocess.call([sys.executable, "-m", "streamlit", "run", str(app_path), *args]))

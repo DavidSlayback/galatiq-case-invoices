@@ -26,7 +26,7 @@ Decisions from the grilling session on 2026-11-12. Each one comes from David unl
 | D13 (B-10) | Format loaders (json, csv, xml, pdf text) run first. The LLM extraction agent always produces the typed `Invoice`, and deterministic checks reconcile the totals. | Agentic, yet anchored by the parsers. |
 | D14 (B-11) | Extraction self-correction: feed the specific mismatch back, at most 2 retries, then keep the result with an "arithmetic mismatch" finding, which validation rejects. | The LLM must not invent consistency (1009's mismatch is real). |
 | D15 (B-9, B-11) | In the VP tier, a VP agent proposes approve or reject, citing rule IDs. A separate critic agent checks it. If they still disagree after 2 rounds, a human decides. A code guardrail makes approval impossible when any hard rule failed. | The LLM has real but bounded authority (FR-3.6). |
-| D16 (B-13) | PDFs: use the text layer if present. Otherwise run Tesseract OCR, and if OCR is empty or low-confidence, fall back to a vision model. | David answered "3 then 1": local first, model last. |
+| D16 (B-13) | PDFs: use the text layer if present. Otherwise run Tesseract OCR, and if OCR is empty or low-confidence, fall back to a vision model. *Amended by D49: a scan always goes to the model as page images, with any OCR text as a hint.* | David answered "3 then 1": local first, model last. |
 | D17 | Business data (inventory with prices, vendors, ledger, findings, decisions, payments, inbox) lives in SQLite. The business-level history is the event ledger (D25); the JSONL traces are agent-level detail. Per-run agent traces (prompts, tool calls, tokens, latency) go to JSONL under `runs/`. | Large trace data stays out of the database. |
 
 ## Product

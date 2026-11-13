@@ -9,7 +9,7 @@ Acme loses **$2M a year** processing invoices by hand: a 30% error rate and a 5-
 | Handled with no person | 0% | **78%**, on a test set deliberately full of problems |
 | Model cost per invoice | — | **~4.6¢** (Grok 4.7 at published API prices) |
 
-The case brief is in [docs/BRIEF.md](docs/BRIEF.md). A 2½-minute narrated demo is in [docs/demo/demo.mp4](docs/demo/demo.mp4) (synthetic voice; every screen is real command output). The presentation is a one-page walkthrough of the architecture, decisions and results: [Acme Invoice Agents explainer](https://claude.ai/artifact/Uk4Fdc3Wff3zQPaVSpUghN) (updated 2026-11-13 for commit bca5d09).
+The case brief is in [docs/BRIEF.md](docs/BRIEF.md). A 2½-minute narrated demo is in [docs/demo/demo.mp4](docs/demo/demo.mp4) (synthetic voice; every screen is real command output). The presentation is a one-page walkthrough of the architecture, decisions and results: [Acme Invoice Agents explainer](https://claude.ai/artifact/Uk4Fdc3Wff3zQPaVSpUghN) (updated 2026-11-13 for commit f1e56a4).
 
 ## Quickstart
 
@@ -97,8 +97,8 @@ Traps in the data, including several the brief's table doesn't mention:
 | 1005 | GadgetX over stock, and a vendor address of 1600 Pennsylvania Ave | Rejected; fraud signal recorded |
 | 1012 | OCR noise (`2O26`), a renamed vendor, and $9,975, just under the limit | Sent to a person ("vendor change") |
 | 1004 R1 | A revision arriving after the original was paid | Superseded; only the +$4,050 difference goes to a person |
-| 1011, 1012, 1013 | The same invoice as both PDF and text | Second copy skipped |
-| adversarial/ | Prompt injection, split invoices, look-alike vendor, new bank details | All sent to a person, labelled "suspected fraud" |
+| 1011, 1012, 1013 | The same invoice in two formats (PDF and text, or PDF and JSON for 1013), plus a scanned copy of 1011 | Later copies skipped |
+| adversarial/ | Prompt injection, an invoice split in two to stay under the limit, look-alike vendor, new bank details, and a clean control | Injection, the second split half, look-alike and bank change go to a person, labelled "suspected fraud"; the first split half (alone under the limit) and the control are paid |
 
 ## Business impact
 
@@ -124,7 +124,7 @@ Every decision, its reason, and whether David or the agent made it is in [docs/D
 
 - **Purchase-order matching.** Replace the literal stock check with a PO and goods-received three-way match.
 - **Stock reservation.** Approved invoices don't consume stock (D3), so every invoice is checked against the seeded stock.
-- **Payment idempotency at the bank.** The ledger is idempotent, but a crash between the bank call and the ledger write could double-pay. A real bank API needs an idempotency key.
+- **Payment idempotency at the bank.** A crash or timeout never re-sends a payment: the pending row goes to a person to check at the bank (D41, D45), and any late second send is recorded for recovery. Only a bank-side idempotency key prevents two sends when a retry races a slow original.
 - **Scale.** SQLite and one process are fine for a prototype; production needs a queue and Postgres.
 - **Database tools.** The key columns use a custom collation (`FOLD`, D40). Other SQLite tools must register it, with `invoice_agents.identity.register(conn)`, before they can filter or write those columns.
 - **The test set is small.** It has 27 invoices, deliberately full of problems, so the measured rates are evidence, not a forecast.
@@ -148,4 +148,4 @@ fixtures/golden/           recorded model answers for offline mode
 docs/                      brief, PRD, decisions, rules, live results, plan and tickets
 ```
 
-Checks: `scripts/check-all` (ruff, pyright strict, 338 tests including the offline eval), also run as a pre-commit hook.
+Checks: `scripts/check-all` (ruff, pyright strict, 340 tests including the offline eval), also run as a pre-commit hook.
