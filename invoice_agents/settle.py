@@ -43,6 +43,9 @@ def settle(
 ) -> Settled:
     """Apply the guardrail, record the decision, then pay or reject.
 
+    Not one transaction: GUARDRAIL_OVERRIDE and DECIDED commit before payment starts,
+    and :func:`payment.pay` guards the bank call with its own outbox.
+
     Args:
         conn: Open connection.
         key: Ledger key of the invoice being settled.
@@ -54,8 +57,12 @@ def settle(
         run_id: Current run.
         bank: Payment API.
 
+    Returns:
+        REJECTED, or whatever :func:`payment.pay` reported for an approval.
+
     Raises:
         ValueError: An approval with no total, or a decision that is neither approve nor reject.
+            Nothing is paid; a GUARDRAIL_OVERRIDE event may already be recorded.
     """
     final, overridden = approval.guard(decision, findings)
     if overridden:

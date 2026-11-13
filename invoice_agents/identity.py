@@ -24,12 +24,18 @@ _CONFLICT = " (conflict "
 
 
 def fold(s: str | None) -> str:
-    """Comparison form: NFKC, full Unicode case folding, single spaces."""
+    """Comparison form: NFKC, full Unicode case folding, single spaces.
+
+    NFKC makes full-width and compatibility forms one identity (D36), so a
+    look-alike spelling can never open a second ledger row and be paid twice.
+    It runs again after ``casefold``, whose output need not be NFKC-normal.
+    """
     once = unicodedata.normalize("NFKC", s or "").casefold()
     return " ".join(unicodedata.normalize("NFKC", once).split())
 
 
 def _collate(a: str, b: str) -> int:
+    """SQLite collation callback: strings with the same :func:`fold` compare equal."""
     fa, fb = fold(a), fold(b)
     return (fa > fb) - (fa < fb)
 
@@ -40,7 +46,11 @@ def plain(s: str | None) -> str:
 
 
 def register(conn: sqlite3.Connection) -> None:
-    """Teach a connection the ``FOLD`` collation (must run before the schema is used)."""
+    """Teach a connection the ``FOLD`` collation.
+
+    Must run before any statement touches a key column; SQLite rejects such a
+    statement ("no such collation sequence") on a connection without it.
+    """
     conn.create_collation(COLLATION, _collate)
 
 
@@ -62,8 +72,11 @@ def key_for(conn: sqlite3.Connection, inv: Invoice, file_sha256: str) -> Invoice
     """Ledger key for an extracted invoice.
 
     The vendor is the registered name when the invoice names it exactly or by an
-    alias, else the name as written (spaces collapsed). Placeholders keep
+    alias, else the name as written (NFKC, spaces collapsed). Placeholders keep
     invoices with no vendor or number distinct from each other.
+
+    Raises:
+        ValueError: The vendor registry is ambiguous (see :func:`registry`).
     """
     written = " ".join(unicodedata.normalize("NFKC", inv.vendor or "").split())
     vendor = registry(conn).get(fold(written), written) if written else "(missing vendor)"
@@ -72,7 +85,11 @@ def key_for(conn: sqlite3.Connection, inv: Invoice, file_sha256: str) -> Invoice
 
 
 def conflict_key(key: InvoiceKey, file_sha256: str) -> InvoiceKey:
-    """Key for a copy whose content conflicts with the invoice on file; the original's row stays intact."""
+    """Key for a copy whose content conflicts with the invoice on file; the original's row stays intact.
+
+    :func:`same_invoice` still matches the copy to the original, so anything
+    paid on either counts against both (B7).
+    """
     return key._replace(invoice_number=f"{key.invoice_number}{_CONFLICT}{file_sha256[:8]})")
 
 

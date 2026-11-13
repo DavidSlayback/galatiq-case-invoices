@@ -105,10 +105,10 @@ def route(
     fraud = _ids(findings, "fraud")
     if fraud:
         return HumanReview(invoice, findings, usd_total, reason="fraud signals: " + ", ".join(fraud), label=FRAUD_LABEL)
-    master = [f for f in findings if f.rule_id in VENDOR_MASTER_CHANGES]
-    if master:
+    vendor_changes = [f for f in findings if f.rule_id in VENDOR_MASTER_CHANGES]
+    if vendor_changes:
         # D33: a change to who gets paid is confirmed by a person, not judged by an agent.
-        detail = tuple(f.message for f in master)
+        detail = tuple(f.message for f in vendor_changes)
         return HumanReview(invoice, findings, usd_total, reason="vendor_change", label=CHANGE_LABEL, detail=detail)
     if usd_total is None:
         return HumanReview(invoice, findings, usd_total, reason="total could not be determined in USD")

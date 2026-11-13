@@ -82,7 +82,7 @@ class Conflict:
 
 @dataclass(frozen=True)
 class Revision:
-    """A higher revision of a known invoice."""
+    """A higher revision of a known invoice; ``open_inbox_ids`` are the items it withdraws (never payment items)."""
 
     previous_revision: int
     changes: dict[str, Any]
@@ -101,7 +101,11 @@ Check = New | Duplicate | Conflict | Revision | Stale
 
 
 def check(conn: sqlite3.Connection, key: InvoiceKey, inv: Invoice) -> Check:
-    """Compare an extracted invoice with what the ledger already holds for its vendor and number."""
+    """Compare an extracted invoice with what the ledger already holds for its vendor and number.
+
+    Read-only. Only the revision on file is compared: the same revision is a
+    duplicate or a conflict, a lower one is stale, a higher one is a revision.
+    """
     row = db.invoice_row(conn, key.vendor, key.invoice_number)
     if row is None or row["core"] is None:
         return New()
@@ -196,7 +200,7 @@ def intake(
     Duplicates and stale revisions get RECEIVED and DUPLICATE_SKIPPED events and leave the
     status row of the copy on file alone. Everything else is recorded RECEIVED then EXTRACTED;
     a conflicting copy gets its own key, and a revision supersedes the original and withdraws
-    its open inbox items.
+    its open inbox items. Each event is its own transaction.
 
     Args:
         conn: Open connection.
@@ -208,6 +212,7 @@ def intake(
     """
     found = check(conn, key, inv)
     verdict = type(found).__name__
+    findings: list[Finding] = []
     if isinstance(found, Duplicate | Stale):
         db.record(conn, key, EventType.RECEIVED, actor="intake", run_id=run_id, payload=dict(source))
         why: dict[str, object] = (
@@ -216,12 +221,10 @@ def intake(
             else {"stale_revision": inv.revision, "current_revision": found.current_revision}
         )
         db.record(conn, key, EventType.DUPLICATE_SKIPPED, actor="ledger", run_id=run_id, payload=why)
-        findings = []
         if isinstance(found, Stale):
             msg = f"revision {inv.revision} is older than revision {found.current_revision} on file"
             findings.append(Finding(rule_id="STALE_REVISION", severity="soft", message=msg))
         return Intake(key, verdict, skipped=why, findings=findings)
-    findings: list[Finding] = []
     if isinstance(found, Conflict):
         key = identity.conflict_key(key, source["sha256"])
         msg = f"same invoice number and revision as one on file, but {', '.join(found.fields)} differ"

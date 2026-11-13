@@ -3,6 +3,8 @@
 A decision needs a note, writes a ``human_decision`` event, and then settles
 through :mod:`invoice_agents.settle`, the same step that ends a graph run, so
 the guardrail and the audit trail do not depend on who decided (D19, D42).
+Items about a payment rather than an invoice (unconfirmed, overpayment) are
+answered against that payment instead (D45).
 """
 
 import json
@@ -87,6 +89,7 @@ def list_open(conn: sqlite3.Connection) -> list[Item]:
 
 
 def _find(conn: sqlite3.Connection, invoice_number: str, vendor: str | None, inbox_id: int | None) -> sqlite3.Row:
+    """The open item to act on: by id, else the newest open item for that number (and vendor, if given)."""
     if inbox_id is not None:
         rows = conn.execute("SELECT * FROM inbox WHERE id=?", (inbox_id,)).fetchall()
     else:
@@ -116,12 +119,20 @@ def resolve(
     inbox_id: int | None = None,
     bank: payment.Bank = payment.mock_payment,
 ) -> dict[str, Any]:
-    """Approve (and pay) or reject one escalated invoice.
+    """Decide one open inbox item; what approve means depends on the item's reason.
+
+    - ``overpayment``: either choice records the recovery; nothing is paid.
+    - ``payment_unconfirmed``: approve = the payment is at the bank (settle it, no
+      resend); reject = it is not (cancel it, which queues a retry item).
+    - Anything else: approve pays through :func:`settle.settle` (the guardrail
+      applies, D15), reject records the rejection.
+
+    The decision and the item's closing commit together before settling starts.
 
     Args:
         conn: Open connection.
         invoice_number: Ledger invoice number, e.g. ``INV-1012``.
-        approve: True to approve and pay, False to reject.
+        approve: True to approve, False to reject.
         note: Required justification, stored on the event.
         reviewer: Who decided, e.g. ``human:cli``.
         vendor: Disambiguates when two vendors use the same invoice number.
@@ -129,10 +140,11 @@ def resolve(
         bank: Payment adapter.
 
     Returns:
-        What happened: status, and the amount paid if any.
+        ``{"status": ...}`` plus ``"amount"`` (attempted or recovered) unless rejected.
 
     Raises:
-        InboxError: Missing note, unknown or closed item, or an invoice that cannot be approved.
+        InboxError: Missing note, unknown or closed item, ambiguous vendor, a payment no longer
+            pending, or an invoice that cannot be approved. Nothing is recorded.
     """
     if not note.strip():
         raise InboxError("a note is required for every human decision")

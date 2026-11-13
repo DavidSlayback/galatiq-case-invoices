@@ -1,8 +1,9 @@
-"""The processing graph: load → extract ⇄ reconcile → validate → route → settle (pay or reject) / escalate.
+"""The processing graph: load → extract ⇄ reconcile → ledger → validate → VP ⇄ critic → settle / escalate.
 
-Built with pydantic-graph (D11). Every step records its business event through
-``db`` and a trace line through ``Tracer``; decisions about what to do live in
-the stage modules (rules, approval, payment), not here.
+Built with pydantic-graph (D11) and wiring only (D43): decisions live in the
+stage modules (reconcile, ledger, rules, approval, settle). Business events go
+through those modules or ``db``; steps add a trace line through ``Tracer``.
+``mermaid()`` draws the full graph.
 """
 
 import asyncio
@@ -57,12 +58,12 @@ class State:
     doc: RawDocument | None = None
     invoice: Invoice | None = None
     key: InvoiceKey | None = None
-    attempt: int = 0
-    feedback: str | None = None
-    history: list[ModelMessage] = field(default_factory=list[ModelMessage])
+    attempt: int = 0  # extraction attempt, 0-based; also the retry count
+    feedback: str | None = None  # reconciliation problems for the next extraction attempt
+    history: list[ModelMessage] = field(default_factory=list[ModelMessage])  # extractor messages, kept across retries
     findings: list[Finding] = field(default_factory=list[Finding])
     model_name: str = ""
-    review_brief: str = ""
+    review_brief: str = ""  # the case the VP and critic both read, built once in round 0
     mismatches: list[str] = field(default_factory=list[str])
     amount_due: Decimal | None = None  # set when a revision arrives after the original was paid
     vp_history: list[ModelMessage] = field(default_factory=list[ModelMessage])
@@ -381,7 +382,12 @@ graph = g.build()
 async def process(
     path: Path, settings: Settings, conn: sqlite3.Connection, run_id: str | None = None, bank: Bank = mock_payment
 ) -> Outcome:
-    """Run one file through the whole graph; ``bank`` is the payment adapter."""
+    """Run one file through the whole graph; ``bank`` is the payment adapter.
+
+    First surfaces any payment a dead process left pending (:func:`payment.sweep_unconfirmed`).
+    Every file ends in an Outcome; errors outside the graph's handled cases (a missing offline
+    golden, a database error) propagate.
+    """
     run_id = run_id or new_run_id()
     payment.sweep_unconfirmed(conn, run_id)
     state = State(path=path, run_id=run_id)

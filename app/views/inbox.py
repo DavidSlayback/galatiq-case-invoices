@@ -43,7 +43,7 @@ for it in items:
             reject = r.form_submit_button("Reject")
             if approve or reject:
                 try:
-                    with contextlib.redirect_stdout(io.StringIO()):
+                    with contextlib.redirect_stdout(io.StringIO()):  # mock_payment prints to the server console
                         res = inbox.resolve(
                             c, it.key.invoice_number, approve=approve, note=note, reviewer="human:ui", inbox_id=it.id
                         )

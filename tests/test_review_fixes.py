@@ -1,4 +1,4 @@
-"""Regressions for the refactor review (R1-R10, D45): recovery, revisions, upgrades and amounts."""
+"""Regressions for the refactor review (R1-R16, D45): recovery, revisions, upgrades, amounts and late bank answers."""
 
 import json
 import sqlite3
@@ -25,6 +25,7 @@ def age_pending(conn: sqlite3.Connection) -> None:
 
 
 def test_r1_a_payment_a_dead_process_left_pending_reaches_the_inbox(conn: sqlite3.Connection, offline: Settings):
+    """The process dies mid-payment; re-running the file is a duplicate, so only the sweep can surface it."""
     with pytest.raises(Crash):
         graph.process_sync(INVOICES / "invoice_1004.json", offline, conn, bank=crash)
     age_pending(conn)
@@ -99,6 +100,7 @@ def test_r11_a_late_bank_success_after_cancel_is_never_sent_again(conn: sqlite3.
 
 
 def test_r12_a_refusal_after_the_sweep_leaves_no_orphan_item(conn: sqlite3.Connection):
+    """The sweep flags a live call, then the bank declines: only the retry item stays open."""
     key = InvoiceKey("Widgets Inc.", "INV-7", 0)
 
     def flagged_then_declined(vendor: str, amount: Decimal) -> dict[str, str]:
@@ -111,6 +113,7 @@ def test_r12_a_refusal_after_the_sweep_leaves_no_orphan_item(conn: sqlite3.Conne
 
 
 def test_r13_a_payment_another_process_holds_never_calls_the_bank(conn: sqlite3.Connection):
+    """Two processes race to claim one payment row; the loser gets no attempt number."""
     key = InvoiceKey("Widgets Inc.", "INV-8", 0)
     assert db.start_payment(conn, key, Decimal(100), "USD", Decimal(100)) == 1  # the other process
     assert db.start_payment(conn, key, Decimal(100), "USD", Decimal(100)) is None  # this one: refused
@@ -144,6 +147,7 @@ def test_r14_a_late_success_after_the_retry_is_recorded_as_an_overpayment(conn: 
 
 
 def test_r15_a_late_success_after_a_declined_retry_is_not_an_overpayment(conn: sqlite3.Connection):
+    """Call flagged and cancelled, retry approved but declined, then the first call succeeds."""
     key = InvoiceKey("Widgets Inc.", "INV-10", 0)
     db.record(conn, key, EventType.RECEIVED, actor="t", run_id="r", status=Status.RECEIVED, total="100")
 
@@ -161,6 +165,7 @@ def test_r15_a_late_success_after_a_declined_retry_is_not_an_overpayment(conn: s
 
 
 def test_r16_a_late_success_while_the_retry_is_pending_then_declined_is_the_only_send(conn: sqlite3.Connection):
+    """Attempt 1 lands late while retry 2 is pending; once 2 is declined, attempt 1 is the payment."""
     key = InvoiceKey("Widgets Inc.", "INV-11", 0)
     amt = {"amount": Decimal(100)}
     first = db.start_payment(conn, key, Decimal(100), "USD", Decimal(100))
