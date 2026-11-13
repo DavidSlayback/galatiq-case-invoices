@@ -1,9 +1,9 @@
 """SQLite store: inventory, vendors, ledger, append-only event log and inbox.
 
-Status changes go through :func:`record`, which appends an event and updates
-the invoice's status row in one transaction (D25); payment and inbox rows are
-written in the same transaction as their event. Triggers make the
-event table append-only.
+The store exposes business transitions, not tables: each function below is
+one transaction that appends its event, updates the invoice's status row and
+writes any payment, inbox or findings rows together (D25). Callers never issue
+SQL against those tables. Triggers make the event table append-only.
 """
 
 import json
@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from invoice_agents import identity
-from invoice_agents.models import EventType, InvoiceKey, Status
+from invoice_agents.models import EventType, Finding, InvoiceKey, Status
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS inventory (
@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS findings (
 CREATE TABLE IF NOT EXISTS payments (
     vendor TEXT NOT NULL COLLATE FOLD, invoice_number TEXT NOT NULL COLLATE FOLD, revision INTEGER NOT NULL,
     amount_paid TEXT NOT NULL, currency TEXT NOT NULL, usd_equivalent TEXT NOT NULL, ts TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'sent',
     UNIQUE (vendor, invoice_number, revision));
 CREATE TABLE IF NOT EXISTS inbox (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -69,6 +70,9 @@ def connect(path: Path | str) -> sqlite3.Connection:
     identity.register(conn)
     conn.execute("PRAGMA journal_mode=WAL")
     conn.executescript(SCHEMA)
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(payments)")}
+    if "status" not in cols:  # databases made before pending payments existed
+        conn.execute("ALTER TABLE payments ADD COLUMN status TEXT NOT NULL DEFAULT 'sent'")
     return conn
 
 
@@ -145,21 +149,27 @@ def enqueue_inbox(
 ) -> None:
     """Put an invoice in the human-review inbox: event, status and inbox row in one transaction."""
     with conn:
-        conn.execute(
-            "INSERT INTO inbox (vendor, invoice_number, revision, reason, label, created_ts, amount_due)"
-            " VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (key.vendor, key.invoice_number, key.revision, reason, label, now(), _opt(amount_due)),
-        )
-        _record(
-            conn,
-            key,
-            EventType.ESCALATED,
-            actor,
-            run_id,
-            {"reason": reason, "label": label, **(payload or {})},
-            Status.ESCALATED,
-            {},
-        )
+        _enqueue(conn, key, reason, run_id, actor, label, amount_due, payload)
+
+
+def _enqueue(
+    conn: sqlite3.Connection,
+    key: InvoiceKey,
+    reason: str,
+    run_id: str,
+    actor: str,
+    label: str | None,
+    amount_due: Decimal | None,
+    payload: dict[str, Any] | None,
+) -> None:
+    """Statements behind :func:`enqueue_inbox`, without opening a transaction."""
+    conn.execute(
+        "INSERT INTO inbox (vendor, invoice_number, revision, reason, label, created_ts, amount_due)"
+        " VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (key.vendor, key.invoice_number, key.revision, reason, label, now(), _opt(amount_due)),
+    )
+    payload = {"reason": reason, "label": label, **(payload or {})}
+    _record(conn, key, EventType.ESCALATED, actor, run_id, payload, Status.ESCALATED, {})
 
 
 def _opt(d: Decimal | None) -> str | None:
@@ -179,3 +189,91 @@ def invoice_row(conn: sqlite3.Connection, vendor: str, invoice_number: str) -> s
     return conn.execute(
         "SELECT * FROM invoices WHERE vendor=? AND invoice_number=?", (vendor, invoice_number)
     ).fetchone()
+
+
+def has_open_inbox(conn: sqlite3.Connection, key: InvoiceKey, reason: str) -> bool:
+    """Whether this invoice revision already waits in the inbox for this reason."""
+    return (
+        conn.execute(
+            "SELECT 1 FROM inbox WHERE vendor=? AND invoice_number=? AND revision=? AND reason=? AND status='open'",
+            (*key, reason),
+        ).fetchone()
+        is not None
+    )
+
+
+def payment_state(conn: sqlite3.Connection, key: InvoiceKey) -> tuple[str, Decimal] | None:
+    """``(pending|sent, amount)`` for one invoice revision, or ``None`` if nothing was attempted."""
+    row = conn.execute(
+        "SELECT status, amount_paid FROM payments WHERE vendor=? AND invoice_number=? AND revision=?", tuple(key)
+    ).fetchone()
+    return None if row is None else (row[0], Decimal(row[1]))
+
+
+def start_payment(conn: sqlite3.Connection, key: InvoiceKey, amount: Decimal, currency: str, usd: Decimal) -> None:
+    """Write the pending payment row before the bank is called, so a crash after the call leaves evidence."""
+    with conn:
+        conn.execute(
+            "INSERT INTO payments (vendor, invoice_number, revision, amount_paid, currency, usd_equivalent, ts, status)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')",
+            (*key, str(amount), currency, str(usd), now()),
+        )
+
+
+def settle_payment(
+    conn: sqlite3.Connection, key: InvoiceKey, *, run_id: str, actor: str, payload: dict[str, Any]
+) -> None:
+    """Mark the pending payment sent and record PAID, in one transaction."""
+    with conn:
+        conn.execute(
+            "UPDATE payments SET status='sent', ts=? WHERE vendor=? AND invoice_number=? AND revision=?",
+            (now(), *key),
+        )
+        _record(conn, key, EventType.PAID, actor, run_id, payload, Status.PAID, {})
+
+
+def fail_payment(
+    conn: sqlite3.Connection, key: InvoiceKey, *, run_id: str, actor: str, amount: Decimal, payload: dict[str, Any]
+) -> None:
+    """Drop the pending row, record PAYMENT_FAILED and queue the invoice for a person, in one transaction."""
+    with conn:
+        conn.execute(
+            "DELETE FROM payments WHERE vendor=? AND invoice_number=? AND revision=? AND status='pending'", tuple(key)
+        )
+        _record(conn, key, EventType.PAYMENT_FAILED, actor, run_id, payload, Status.PAYMENT_FAILED, {})
+        _enqueue(conn, key, "payment_failed", run_id, actor, None, amount, {"errors": payload.get("errors", [])})
+
+
+def record_findings(conn: sqlite3.Connection, key: InvoiceKey, run_id: str, findings: list[Finding]) -> None:
+    """Store a run's findings and record VALIDATED, in one transaction."""
+    with conn:
+        conn.executemany(
+            "INSERT INTO findings VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            [(run_id, *key, f.rule_id, f.severity, f.message, json_dumps(f.evidence)) for f in findings],
+        )
+        payload = {"findings": [f.model_dump() for f in findings]}
+        _record(conn, key, EventType.VALIDATED, "rules", run_id, payload, Status.VALIDATED, {})
+
+
+def withdraw_inbox(conn: sqlite3.Connection, key: InvoiceKey, inbox_ids: list[int], run_id: str) -> None:
+    """Withdraw open inbox items a newer revision replaces, and record WITHDRAWN, in one transaction."""
+    if not inbox_ids:
+        return
+    with conn:
+        conn.executemany(
+            "UPDATE inbox SET status='withdrawn', resolved_ts=?, note=? WHERE id=?",
+            [(now(), f"superseded by revision {key.revision}", i) for i in inbox_ids],
+        )
+        payload = {"inbox_ids": inbox_ids, "reason": "superseded"}
+        _record(conn, key, EventType.WITHDRAWN, "ledger", run_id, payload, None, {})
+
+
+def resolve_inbox(
+    conn: sqlite3.Connection, inbox_id: int, key: InvoiceKey, *, reviewer: str, run_id: str, decision: dict[str, Any]
+) -> None:
+    """Record a person's decision and close the inbox item, in one transaction."""
+    with conn:
+        _record(conn, key, EventType.HUMAN_DECISION, reviewer, run_id, decision, None, {})
+        conn.execute(
+            "UPDATE inbox SET status='resolved', resolved_ts=?, note=? WHERE id=?", (now(), decision["note"], inbox_id)
+        )

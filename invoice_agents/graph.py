@@ -215,14 +215,7 @@ async def ledger_check(ctx: StepContext[State, Deps, Reconciled]) -> Reconciled 
         core=json.dumps(ledger.core(inv)),
     )  # fmt: skip
     if isinstance(found, ledger.Revision):
-        with d.conn:
-            d.conn.executemany(
-                "UPDATE inbox SET status='withdrawn', resolved_ts=?, note=? WHERE id=?",
-                [(db.now(), f"superseded by revision {inv.revision}", i) for i in found.open_inbox_ids],
-            )
-        if found.open_inbox_ids:
-            db.record(d.conn, s.key, EventType.WITHDRAWN, actor="ledger", run_id=s.run_id,
-                      payload={"inbox_ids": found.open_inbox_ids, "reason": "superseded"})  # fmt: skip
+        db.withdraw_inbox(d.conn, s.key, found.open_inbox_ids, s.run_id)
         db.record(
             d.conn, s.key, EventType.SUPERSEDED, actor="ledger", run_id=s.run_id,
             payload={"previous_revision": found.previous_revision, "revision": inv.revision,
@@ -264,15 +257,7 @@ async def validate(ctx: StepContext[State, Deps, Reconciled]) -> approval.Route:
     assert s.key is not None
     s.findings += rules.validate(inv, d.conn, d.settings.as_of, s.doc.text if s.doc else "")
     s.findings += ledger.split_findings(d.conn, s.key, inv, approval.AUTO_LIMIT)
-    with d.conn:
-        d.conn.executemany(
-            "INSERT INTO findings VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            [(s.run_id, *s.key, f.rule_id, f.severity, f.message, db.json_dumps(f.evidence)) for f in s.findings],
-        )
-    db.record(
-        d.conn, s.key, EventType.VALIDATED, actor="rules", run_id=s.run_id,
-        payload={"findings": [f.model_dump() for f in s.findings]}, status=Status.VALIDATED,
-    )  # fmt: skip
+    db.record_findings(d.conn, s.key, s.run_id, s.findings)
     r = approval.route(inv, s.findings, fx.to_usd(inv.total, inv.currency, fx.rates(d.conn)))
     if s.amount_due is not None and isinstance(r, AutoApprove | VpReview):
         db.record(d.conn, s.key, EventType.REVISION_AFTER_PAYMENT, actor="ledger", run_id=s.run_id,
