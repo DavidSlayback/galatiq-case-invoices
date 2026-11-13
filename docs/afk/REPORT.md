@@ -38,7 +38,7 @@ Run started and finished on 2026-11-12 (one session, with one restart). All 19 t
 
 ## Human-only items left
 
-- Optional: `sudo apt install tesseract-ocr`, to enable the local-OCR path (its test is skipped without it).
+- Done 2026-11-12: David installed `tesseract-ocr`; `scripts/check-all` now runs the local-OCR test with nothing skipped.
 - An xAI API key would let the xAI API path run live; it is configured but unexercised.
 
 ## Close-out
