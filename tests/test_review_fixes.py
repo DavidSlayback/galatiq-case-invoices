@@ -183,6 +183,15 @@ def test_r16_a_late_success_while_the_retry_is_pending_then_declined_is_the_only
     assert inbox.list_open(conn) == []  # no false clawback, no stale retry
 
 
+def test_r17_a_skipped_rerun_does_not_postpone_recovery(conn: sqlite3.Connection, offline: Settings):
+    """Re-running a file inside the bound is a duplicate, and must not restart the 30-minute clock."""
+    graph.process_sync(INVOICES / "invoice_1004.json", offline, conn)
+    with conn:
+        conn.execute("UPDATE invoices SET updated_at='2026-01-01T00:00:00.000+00:00'")
+    graph.process_sync(INVOICES / "invoice_1004.json", offline, conn)  # duplicate: RECEIVED + DUPLICATE_SKIPPED
+    assert conn.execute("SELECT updated_at FROM invoices").fetchone()[0] == "2026-01-01T00:00:00.000+00:00"
+
+
 def test_r17_an_invoice_a_crash_left_after_its_decision_is_resumed_by_a_rerun(
     conn: sqlite3.Connection, offline: Settings, monkeypatch: pytest.MonkeyPatch
 ):

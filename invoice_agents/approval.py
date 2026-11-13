@@ -87,8 +87,9 @@ def route(
 ) -> Route:
     """Pick the approval path for a validated invoice (D7, D10, D27, A8).
 
-    ``amount_due`` is set when this is a revision of an invoice already paid: whatever
-    the amount, the difference goes to a person rather than an agent.
+    ``amount_due`` is set when something was already paid on this invoice (a revision, or a
+    run resumed after a crash, D46): whatever the amount, the difference goes to a person
+    rather than an agent.
 
     Order matters: hard findings reject first, so a fraud signal on an invoice
     that is invalid anyway does not cost a human's time.

@@ -65,7 +65,7 @@ class State:
     model_name: str = ""
     review_brief: str = ""  # the case the VP and critic both read, built once in round 0
     mismatches: list[str] = field(default_factory=list[str])
-    amount_due: Decimal | None = None  # set when a revision arrives after the original was paid
+    amount_due: Decimal | None = None  # set when something was already paid on this invoice (A8, D46)
     vp_history: list[ModelMessage] = field(default_factory=list[ModelMessage])
 
 

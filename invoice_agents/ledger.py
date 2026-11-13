@@ -206,7 +206,8 @@ class Intake:
         verdict: Name of the ledger check result, for the trace.
         skipped: Why the invoice is not processed further (duplicate or stale), else ``None``.
         findings: Findings the ledger raises (STALE_REVISION, DUPLICATE_NUMBER_CONFLICT).
-        amount_due: For a revision of a paid invoice, what is still owed; else ``None``.
+        amount_due: What is still owed when anything was already paid on this invoice (an earlier
+            revision, a conflict copy, or this revision before a crash, D46); else ``None``.
     """
 
     key: InvoiceKey

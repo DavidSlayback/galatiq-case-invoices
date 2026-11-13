@@ -167,7 +167,11 @@ def _record(
         " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
         (ts, run_id, key.vendor, key.invoice_number, key.revision, event, actor, json_dumps(payload or {})),
     )
-    if status is None:  # still a sign of life: run recovery (D46) judges staleness by this column
+    if status is None:
+        # A sign of life: run recovery (D46) judges staleness by this column. A skipped copy is
+        # not the invoice's run, so re-running the file does not postpone its recovery.
+        if event in (EventType.RECEIVED, EventType.DUPLICATE_SKIPPED):
+            return
         conn.execute(
             "UPDATE invoices SET updated_at=? WHERE vendor=? AND invoice_number=?", (ts, key.vendor, key.invoice_number)
         )
