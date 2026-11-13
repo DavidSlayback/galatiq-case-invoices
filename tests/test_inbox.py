@@ -22,7 +22,7 @@ def test_1012_approved_by_human_is_paid(conn: sqlite3.Connection, offline: Setti
     assert res == {"status": "paid", "amount": "9975.00"}
     # The alias is keyed under the registered vendor, so the payment goes to FastShip's record.
     evts = [e["event"] for e in db.events(conn, "FastShip Ltd.", "INV-1012")]
-    assert evts[-2:] == ["human_decision", "paid"] and inbox.list_open(conn) == []
+    assert evts[-3:] == ["human_decision", "decided", "paid"] and inbox.list_open(conn) == []
 
 
 def test_revision_delta_approval_pays_only_the_delta(conn: sqlite3.Connection, offline: Settings):

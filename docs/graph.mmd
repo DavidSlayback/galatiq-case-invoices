@@ -17,8 +17,7 @@ stateDiagram-v2
   validate
   state decision_5 <<choice>>
   escalate
-  pay
-  reject
+  settle_step
   vp_propose
   state decision_6 <<choice>>
   critique
@@ -43,17 +42,16 @@ stateDiagram-v2
   duplicate --> [*]
   validate --> decision_5
   decision_5 --> escalate
-  decision_5 --> pay
-  decision_5 --> reject
+  decision_5 --> settle_step
+  decision_5 --> settle_step
   decision_5 --> vp_propose
   escalate --> [*]
-  pay --> [*]
-  reject --> [*]
+  settle_step --> [*]
   vp_propose --> decision_6
   decision_6 --> escalate
   decision_6 --> critique
   critique --> decision_7
   decision_7 --> escalate
-  decision_7 --> pay
-  decision_7 --> reject
+  decision_7 --> settle_step
+  decision_7 --> settle_step
   decision_7 --> vp_propose

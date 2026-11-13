@@ -1,4 +1,4 @@
-"""The processing graph: load → extract ⇄ reconcile → validate → route → pay / reject / escalate.
+"""The processing graph: load → extract ⇄ reconcile → validate → route → settle (pay or reject) / escalate.
 
 Built with pydantic-graph (D11). Every step records its business event through
 ``db`` and a trace line through ``Tracer``; decisions about what to do live in
@@ -16,7 +16,7 @@ from pydantic_ai.exceptions import UnexpectedModelBehavior
 from pydantic_ai.messages import ModelMessage
 from pydantic_graph import GraphBuilder, StepContext
 
-from invoice_agents import approval, db, fx, identity, ledger, payment, reconcile, rules
+from invoice_agents import approval, db, fx, identity, ledger, reconcile, rules, settle
 from invoice_agents.agents import extractor, reviewers
 from invoice_agents.approval import Approve, AutoApprove, HumanReview, Objected, Proposed, Reject, VpReview
 from invoice_agents.loaders import LoadError, load
@@ -289,7 +289,7 @@ async def vp_propose(ctx: StepContext[State, Deps, VpReview | Objected]) -> Prop
 
 @g.step
 async def critique(ctx: StepContext[State, Deps, Proposed]) -> Approve | Reject | Objected | HumanReview:
-    """The critic checks the proposal; agreement is final (after the guardrail), deadlock goes to a human."""
+    """The critic checks the proposal; agreement goes to settlement, deadlock to a human."""
     s, r, d = ctx.state, ctx.inputs, ctx.deps
     assert s.doc is not None and r.decision is not None and s.key is not None
     known = {f.rule_id for f in r.findings}
@@ -303,14 +303,10 @@ async def critique(ctx: StepContext[State, Deps, Proposed]) -> Approve | Reject 
         except UnexpectedModelBehavior as e:
             return HumanReview(r.invoice, r.findings, r.usd_total, reason=f"critic agent failed: {e}")
     d.tracer.log("critique", round=r.round, verdict=verdict.model_dump(), tokens=critic_tokens)
-    if verdict.agrees:
-        decision, overridden = approval.guard(r.decision, r.findings)
-        if overridden:
-            db.record(d.conn, s.key, EventType.GUARDRAIL_OVERRIDE, actor="guardrail", run_id=s.run_id,
-                      payload={"proposed": r.decision.model_dump(), "final": decision.model_dump()})  # fmt: skip
-        if decision.kind == "approve":
-            return Approve(r.invoice, r.findings, r.usd_total, decision=decision)
-        return Reject(r.invoice, r.findings, r.usd_total, decision=decision)
+    if verdict.agrees:  # settling applies the guardrail, so an agreed approval with a hard finding still rejects
+        if r.decision.kind == "approve":
+            return Approve(r.invoice, r.findings, r.usd_total, decision=r.decision)
+        return Reject(r.invoice, r.findings, r.usd_total, decision=r.decision)
     if r.round + 1 < approval.MAX_REVIEW_ROUNDS:
         return Objected(r.invoice, r.findings, r.usd_total, objections=tuple(verdict.objections), round=r.round)
     vp = f"VP proposed {r.decision.kind}: " + " ".join(r.decision.reasons)
@@ -318,63 +314,21 @@ async def critique(ctx: StepContext[State, Deps, Proposed]) -> Approve | Reject 
     return HumanReview(r.invoice, r.findings, r.usd_total, reason="vp_critic_disagree", detail=(vp, critic))
 
 
-def _decided(ctx: StepContext[State, Deps, object], decision: Decision) -> InvoiceKey:
-    s = ctx.state
-    assert s.key is not None
-    db.record(
-        ctx.deps.conn, s.key, EventType.DECIDED, actor=decision.actor, run_id=s.run_id,
-        payload=decision.model_dump(),
-    )  # fmt: skip
-    return s.key
-
-
 @g.step
-async def pay(ctx: StepContext[State, Deps, AutoApprove | Approve]) -> Outcome:
-    """Pay an approved invoice."""
-    r = ctx.inputs
-    decision = (
-        r.decision
-        if isinstance(r, Approve) and r.decision
-        else Decision(kind="approve", actor="rules", reasons=["clean and under the auto-approval limit"])
-    )
-    key = _decided(ctx, decision)
-    assert r.invoice.total is not None
-    res = payment.pay(ctx.deps.conn, key, r.invoice.total, r.invoice.currency, r.usd_total, ctx.state.run_id)
-    return Outcome(
-        key=key,
-        status=res.status,
-        decision=decision,
-        findings=r.findings,
-        run_id=ctx.state.run_id,
-        amount_paid=res.amount if res.status == Status.PAID else None,
-        invoice=r.invoice,
-    )
-
-
-@g.step
-async def reject(ctx: StepContext[State, Deps, Reject]) -> Outcome:
-    """Log a rejection with its reasons and the offending findings (FR-4.2)."""
-    r = ctx.inputs
-    decision = r.decision or Decision(kind="reject", actor="rules")
-    key = _decided(ctx, decision)
-    db.record(
-        ctx.deps.conn, key, EventType.REJECTED, actor=decision.actor, run_id=ctx.state.run_id,
-        payload={
-            "reasons": decision.reasons, "rule_ids": decision.cited_rule_ids,
-            # D4: name the offending lines so the vendor can reissue rather than being short-paid.
-            "bad_lines": sorted({str(f.evidence.get("item") or f.evidence.get("sku")) for f in r.findings
-                                 if f.severity == "hard" and (f.evidence.get("item") or f.evidence.get("sku"))}),
-        },
-        status=Status.REJECTED,
+async def settle_step(ctx: StepContext[State, Deps, AutoApprove | Approve | Reject]) -> Outcome:
+    """Pay an approval or log a rejection, through the same settlement a person's decision uses."""
+    r, st = ctx.inputs, ctx.state
+    assert st.key is not None
+    if isinstance(r, AutoApprove):
+        decision = Decision(kind="approve", actor="rules", reasons=["clean and under the auto-approval limit"])
+    else:
+        decision = r.decision or Decision(kind=("approve" if isinstance(r, Approve) else "reject"), actor="rules")
+    done = settle.settle(
+        ctx.deps.conn, st.key, decision, findings=r.findings, total=r.invoice.total, currency=r.invoice.currency,
+        usd_total=r.usd_total, run_id=st.run_id,
     )  # fmt: skip
-    return Outcome(
-        key=key,
-        status=Status.REJECTED,
-        decision=decision,
-        findings=r.findings,
-        run_id=ctx.state.run_id,
-        invoice=r.invoice,
-    )
+    return Outcome(key=st.key, status=done.status, decision=done.decision, findings=r.findings, run_id=st.run_id,
+                   amount_paid=done.amount_paid, invoice=r.invoice)  # fmt: skip
 
 
 @g.step
@@ -382,7 +336,10 @@ async def escalate(ctx: StepContext[State, Deps, HumanReview]) -> Outcome:
     """Send to the human inbox."""
     r = ctx.inputs
     decision = Decision(kind="escalate", actor="approval", reasons=[r.reason, *r.detail], label=r.label)
-    key = _decided(ctx, decision)
+    key = ctx.state.key
+    assert key is not None
+    db.record(ctx.deps.conn, key, EventType.DECIDED, actor=decision.actor, run_id=ctx.state.run_id,
+              payload=decision.model_dump())  # fmt: skip
     db.enqueue_inbox(
         ctx.deps.conn, key, reason=r.reason, label=r.label, run_id=ctx.state.run_id, actor="approval",
         amount_due=ctx.state.amount_due,
@@ -440,22 +397,22 @@ g.add(
     g.edge_from(retry).to(extract),
     g.edge_from(validate).to(
         g.decision()
-        .branch(g.match(AutoApprove).to(pay))
+        .branch(g.match(AutoApprove).to(settle_step))
         .branch(g.match(VpReview).to(vp_propose))
         .branch(g.match(HumanReview).to(escalate))
-        .branch(g.match(Reject).to(reject))
+        .branch(g.match(Reject).to(settle_step))
     ),
     g.edge_from(vp_propose).to(
         g.decision().branch(g.match(Proposed).to(critique)).branch(g.match(HumanReview).to(escalate))
     ),
     g.edge_from(critique).to(
         g.decision()
-        .branch(g.match(Approve).to(pay))
-        .branch(g.match(Reject).to(reject))
+        .branch(g.match(Approve).to(settle_step))
+        .branch(g.match(Reject).to(settle_step))
         .branch(g.match(Objected).to(vp_propose))
         .branch(g.match(HumanReview).to(escalate))
     ),
-    g.edge_from(pay, reject, escalate, load_failed, extract_failed, duplicate).to(g.end_node),
+    g.edge_from(settle_step, escalate, load_failed, extract_failed, duplicate).to(g.end_node),
 )
 graph = g.build()
 
