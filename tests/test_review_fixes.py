@@ -273,3 +273,32 @@ def test_r20_a_human_decision_a_crash_left_unsettled_goes_back_to_the_person(
     assert inbox.resolve(conn, "INV-1004", approve=False, note="still fake", reviewer="human:t") == {
         "status": "rejected"
     }
+
+
+def test_r21_a_quick_rerun_does_not_hide_an_unsettled_human_decision(
+    conn: sqlite3.Connection, offline: Settings, monkeypatch: pytest.MonkeyPatch
+):
+    """A re-run inside the sweep window writes received + duplicate_skipped after the person's decision."""
+    from invoice_agents import approval, settle
+
+    def escalate(inv: object, f: object, usd: object, due: object = None) -> object:
+        return approval.HumanReview(inv, f, usd, reason="held")  # type: ignore[arg-type]
+
+    monkeypatch.setattr(approval, "route", escalate)
+    graph.process_sync(INVOICES / "invoice_1004.json", offline, conn)
+    monkeypatch.undo()
+    (item,) = inbox.list_open(conn)
+
+    def dies(*_: object, **__: object) -> None:
+        raise Crash
+
+    monkeypatch.setattr(settle, "settle", dies)
+    with pytest.raises(Crash):
+        inbox.resolve(conn, "INV-1004", approve=False, note="fake vendor", reviewer="human:t", inbox_id=item.id)
+    monkeypatch.undo()
+    graph.process_sync(INVOICES / "invoice_1004.json", offline, conn)  # right away: skipped as a duplicate
+    with conn:
+        conn.execute("UPDATE invoices SET updated_at='2000-01-01T00:00:00'")
+    assert [i.reason for i in inbox.list_open(conn)] == ["decision_unsettled"]
+    graph.process_sync(INVOICES / "invoice_1004.json", offline, conn)
+    assert db.payment_state(conn, item.key) is None  # never paid what a person rejected

@@ -286,9 +286,16 @@ def intake(
     return Intake(key, verdict, findings=findings, amount_due=amount_due)
 
 
+# Events a skipped re-run writes: they record that a copy arrived, not a step of the invoice's
+# own run, so they must never hide the step a crash cut short.
+_ARRIVALS = "('received', 'duplicate_skipped')"
+
+
 def _last_event(conn: sqlite3.Connection, key: InvoiceKey) -> str | None:
+    """The invoice's latest event, ignoring arrivals of copies."""
     row = conn.execute(
-        "SELECT event FROM invoice_events WHERE vendor=? AND invoice_number=? ORDER BY id DESC LIMIT 1",
+        "SELECT event FROM invoice_events WHERE vendor=? AND invoice_number=?"
+        f" AND event NOT IN {_ARRIVALS} ORDER BY id DESC LIMIT 1",
         (key.vendor, key.invoice_number),
     ).fetchone()
     return None if row is None else row[0]
@@ -311,7 +318,7 @@ def sweep_unsettled_decisions(conn: sqlite3.Connection, run_id: str) -> int:
     rows = conn.execute(
         "SELECT i.vendor, i.invoice_number, i.revision, e.payload FROM invoices i"
         " JOIN invoice_events e ON e.id = (SELECT max(id) FROM invoice_events"
-        "   WHERE vendor=i.vendor AND invoice_number=i.invoice_number)"
+        f"   WHERE vendor=i.vendor AND invoice_number=i.invoice_number AND event NOT IN {_ARRIVALS})"
         " WHERE i.status='escalated' AND e.event='human_decision' AND i.updated_at<=?"
         " AND NOT EXISTS (SELECT 1 FROM inbox WHERE vendor=i.vendor AND invoice_number=i.invoice_number"
         "   AND status='open')"
