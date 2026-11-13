@@ -9,6 +9,7 @@ from app.common import chip, conn, settings
 from invoice_agents import inbox
 
 # (approve label, reject label, help) by inbox reason: approving a payment item sends nothing new.
+LEARNABLE = {"VENDOR_RENAMED", "BANK_DETAILS_CHANGED"}
 DEFAULT_BUTTONS = ("Approve and pay", "Reject", "")
 BUTTONS = {
     "payment_unconfirmed": (
@@ -58,6 +59,14 @@ for it in items:
             yes, no, help_text = BUTTONS.get(it.reason, DEFAULT_BUTTONS)
             if help_text:
                 st.caption(help_text)
+            learn = False
+            if LEARNABLE & set(it.flags):  # D50: only a rename or new bank details can be confirmed
+                learn = st.checkbox(
+                    "I verified this with the vendor: also update the vendor record",
+                    key=f"learn-{it.id}",
+                    help="Adds the new name (or bank details) to the registry, so the vendor's next invoice is not"
+                    " flagged for it again. Logged with your note. Only applies when you approve.",
+                )
             a, r = st.columns(2)
             approve = a.form_submit_button(yes, type="primary")
             reject = r.form_submit_button(no)
@@ -65,8 +74,9 @@ for it in items:
                 try:
                     with contextlib.redirect_stdout(io.StringIO()):  # mock_payment prints to the server console
                         res = inbox.resolve(
-                            c, it.key.invoice_number, approve=approve, note=note, reviewer="human:ui", inbox_id=it.id
-                        )
+                            c, it.key.invoice_number, approve=approve, note=note, reviewer="human:ui",
+                            inbox_id=it.id, update_vendor=learn and approve,
+                        )  # fmt: skip
                     st.session_state.inbox_msg = f"{it.key.invoice_number}: {res['status']} {res.get('amount', '')}"
                     st.rerun()
                 except inbox.InboxError as e:

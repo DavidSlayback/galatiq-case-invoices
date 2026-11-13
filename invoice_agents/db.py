@@ -24,7 +24,8 @@ CREATE TABLE IF NOT EXISTS inventory (
     item TEXT PRIMARY KEY, stock INTEGER NOT NULL, unit_price TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS vendors (
     name TEXT PRIMARY KEY, address TEXT, known INTEGER NOT NULL,
-    aliases_json TEXT NOT NULL DEFAULT '[]', bank_ref TEXT);
+    aliases_json TEXT NOT NULL DEFAULT '[]', bank_ref TEXT,
+    confirmed_names_json TEXT NOT NULL DEFAULT '[]');  -- names a person verified (D50): match exactly
 CREATE TABLE IF NOT EXISTS fx_rates (
     currency TEXT PRIMARY KEY, usd_rate TEXT NOT NULL, as_of TEXT NOT NULL, source TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS invoices (
@@ -121,6 +122,8 @@ def connect(path: Path | str) -> sqlite3.Connection:
         conn.execute("ALTER TABLE payments ADD COLUMN status TEXT NOT NULL DEFAULT 'sent'")
     if "attempt" not in cols:
         conn.execute("ALTER TABLE payments ADD COLUMN attempt INTEGER NOT NULL DEFAULT 1")
+    if "confirmed_names_json" not in {r[1] for r in conn.execute("PRAGMA table_info(vendors)")}:
+        conn.execute("ALTER TABLE vendors ADD COLUMN confirmed_names_json TEXT NOT NULL DEFAULT '[]'")
     return conn
 
 
@@ -457,3 +460,34 @@ def pending_payment(conn: sqlite3.Connection, key: InvoiceKey) -> tuple[Decimal,
         tuple(key),
     ).fetchone()
     return None if row is None else (Decimal(row[0]), int(row[1]))
+
+
+def update_vendor_master(
+    conn: sqlite3.Connection, key: InvoiceKey, change: dict[str, str], *, actor: str, run_id: str, note: str
+) -> None:
+    """Apply one vendor-master change a person verified, and record it, in one transaction (D50).
+
+    ``change`` is ``{"vendor": registered name, "field": "confirmed_name" | "bank_ref", "value": ...}``.
+    A confirmed name is added to the vendor's confirmed names; a bank reference replaces the one
+    on file. The event is recorded against the invoice that prompted the change.
+    """
+    with conn:
+        row = conn.execute(
+            "SELECT confirmed_names_json, bank_ref FROM vendors WHERE name=?", (change["vendor"],)
+        ).fetchone()
+        if row is None:
+            raise ValueError(f"no registered vendor {change['vendor']!r}")
+        before: object
+        if change["field"] == "confirmed_name":
+            names = json.loads(row["confirmed_names_json"])
+            before = list(names)
+            if change["value"] not in names:
+                names.append(change["value"])
+            conn.execute(
+                "UPDATE vendors SET confirmed_names_json=? WHERE name=?", (json.dumps(names), change["vendor"])
+            )
+        else:
+            before = row["bank_ref"]
+            conn.execute("UPDATE vendors SET bank_ref=? WHERE name=?", (change["value"], change["vendor"]))
+        payload = {**change, "before": before, "note": note}
+        _record(conn, key, EventType.VENDOR_MASTER_UPDATED, actor, run_id, payload, None, {})

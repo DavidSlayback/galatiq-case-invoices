@@ -174,6 +174,10 @@ def review(
     reject: Annotated[bool, typer.Option("--reject", help="Reject.")] = False,
     note: Annotated[str, typer.Option("--note", help="Required reason for the decision.")] = "",
     vendor: Annotated[str | None, typer.Option("--vendor", help="Needed when two vendors share the number.")] = None,
+    update_vendor: Annotated[
+        bool,
+        typer.Option("--update-vendor", help="With --approve: you verified a rename or new bank details; record it."),
+    ] = False,
     db: DbOpt = None,
 ) -> None:
     """List escalated invoices, or approve/reject one with a note."""
@@ -187,8 +191,9 @@ def review(
     try:
         with contextlib.redirect_stdout(io.StringIO()):
             result = inbox.resolve(
-                conn, invoice_number, approve=approve, note=note, reviewer="human:cli", vendor=vendor
-            )
+                conn, invoice_number, approve=approve, note=note, reviewer="human:cli", vendor=vendor,
+                update_vendor=update_vendor,
+            )  # fmt: skip
     except inbox.InboxError as e:
         console.print(f"[red]{e}[/red]")
         raise typer.Exit(1) from e

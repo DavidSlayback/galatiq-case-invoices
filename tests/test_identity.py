@@ -77,7 +77,10 @@ def test_full_width_copy_is_a_conflict_not_a_silent_duplicate(conn: sqlite3.Conn
 
 
 def test_an_alias_claimed_by_two_vendors_is_refused(conn: sqlite3.Connection):
-    conn.execute("INSERT INTO vendors VALUES ('Other Ltd.', NULL, 1, '[\"QuickShip Distributors\"]', 'X')")
+    conn.execute(
+        "INSERT INTO vendors (name, address, known, aliases_json, bank_ref)"
+        " VALUES ('Other Ltd.', NULL, 1, '[\"QuickShip Distributors\"]', 'X')"
+    )
     with pytest.raises(ValueError, match="names both"):
         identity.registry(conn)
 

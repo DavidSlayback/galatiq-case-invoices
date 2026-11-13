@@ -29,7 +29,7 @@ def test_every_page_renders(name: str):
 
 def test_process_1012_then_approve_in_inbox():
     at = page("process")
-    at.selectbox(key="sample").set_value("invoice_1012.txt").run()
+    at.selectbox(key="sample").set_value("invoices/invoice_1012.txt").run()
     at.button[0].click().run()
     assert not at.exception
     body = " ".join(m.value for m in at.markdown)

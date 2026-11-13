@@ -1,0 +1,31 @@
+{
+  "source": "data/followup/invoice_1020.txt",
+  "file_sha256": "44f5f0432212d482e0371bfb0465bc8366f17f4de81c92dc8b7bcda1b6a39622",
+  "output": {
+    "vendor": "QuickShip Distributers",
+    "invoice_number": "INV 1020",
+    "invoice_date": "28-Jan-2026",
+    "due_date": "27-Feb-2026",
+    "lines": [
+      {
+        "item": "Widget A",
+        "quantity": "2",
+        "unit_price": "$250",
+        "amount": "$500.00",
+        "note": null
+      },
+      {
+        "item": "WidgetB",
+        "quantity": "1",
+        "unit_price": "$500",
+        "amount": "$500.00",
+        "note": null
+      }
+    ],
+    "subtotal": "$1,000.00",
+    "tax": "$50.00",
+    "total": "$1,050.00",
+    "payment_terms": "Net 30",
+    "notes": "Ref PO-20260120. Restock order."
+  }
+}

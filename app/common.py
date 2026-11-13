@@ -12,13 +12,15 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:  # `streamlit run app/streamlit_app.py` does not put the repo on the path
     sys.path.insert(0, str(ROOT))
 
+from invoice_agents import thread  # noqa: E402
 from invoice_agents.agents.models import detect  # noqa: E402
 from invoice_agents.models import Finding, Outcome  # noqa: E402
 from invoice_agents.seed import open_db  # noqa: E402
 from invoice_agents.settings import Settings, from_env  # noqa: E402
 
 STATUS_COLOUR = {"paid": "green", "rejected": "red", "escalated": "orange", "duplicate_skipped": "blue"}
-SAMPLES = sorted(p for p in (ROOT / "data" / "invoices").rglob("*") if p.is_file())
+# The brief's samples, then follow-ups that show what changes after a person decides (data/followup).
+SAMPLES = [p for d in ("invoices", "followup") for p in sorted((ROOT / "data" / d).rglob("*")) if p.is_file()]
 
 
 def settings() -> Settings:
@@ -82,3 +84,21 @@ def trace(s: Settings, run_id: str) -> list[dict[str, Any]]:
     """The JSONL trace lines for one run."""
     p = s.runs_dir / f"{run_id}.jsonl"
     return [json.loads(x) for x in p.read_text().splitlines()] if p.exists() else []
+
+
+SPEAKERS = {
+    "extractor": ("Extraction agent", ":material/document_scanner:"),
+    "code": ("Rules and ledger (code)", ":material/rule:"),
+    "vp": ("VP agent", ":material/gavel:"),
+    "critic": ("Critic agent", ":material/fact_check:"),
+}
+
+
+def conversation(lines: list[dict[str, Any]]) -> None:
+    """Show a run's trace as the conversation between the agents and the code (D51)."""
+    for turn in thread.turns(lines):
+        name, avatar = SPEAKERS[turn.speaker]
+        with st.chat_message(turn.speaker, avatar=avatar):
+            st.markdown(f"**{name}** · {turn.text}")
+            for d in turn.details:
+                st.markdown(f"- {d}")

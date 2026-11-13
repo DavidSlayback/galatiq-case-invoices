@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 from invoice_agents import identity
+from invoice_agents.models import Finding
 
 Match = Literal["exact", "alias", "lookalike", "unknown", "missing"]
 
@@ -62,3 +63,20 @@ def score(m: VendorMatch, suspicious_address: bool, urgency: bool) -> tuple[int,
         ("urgency", urgency),
     ] if on]  # fmt: skip
     return min(100, sum(WEIGHTS[s] for s in signals)), signals
+
+
+def master_changes(findings: list[Finding], vendor: str) -> list[dict[str, str]]:
+    """Vendor-master changes a person can confirm from an invoice's findings (D50).
+
+    A renamed vendor (VENDOR_RENAMED) can have its new name confirmed; new remittance
+    details (BANK_DETAILS_CHANGED) can replace the bank reference on file. Look-alike
+    names are never offered: confirming one would let an impostor in.
+    """
+    out: list[dict[str, str]] = []
+    for f in findings:
+        if f.rule_id == "VENDOR_RENAMED":
+            out.append({"vendor": str(f.evidence["registered_as"]), "field": "confirmed_name",
+                        "value": str(f.evidence["vendor"])})  # fmt: skip
+        elif f.rule_id == "BANK_DETAILS_CHANGED":
+            out.append({"vendor": vendor, "field": "bank_ref", "value": str(f.evidence["remit_to"])})
+    return out
