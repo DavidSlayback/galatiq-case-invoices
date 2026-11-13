@@ -53,8 +53,8 @@ def test_revision_while_original_in_inbox_withdraws_and_pays_once(
 ):
     real_route = approval.route
 
-    def hold_original(inv: Any, f: Any, t: Any) -> Any:
-        return HumanReview(inv, f, t, reason="held") if inv.revision == 0 else real_route(inv, f, t)
+    def hold_original(inv: Any, f: Any, t: Any, due: Any = None) -> Any:
+        return HumanReview(inv, f, t, reason="held") if inv.revision == 0 else real_route(inv, f, t, due)
 
     monkeypatch.setattr(approval, "route", hold_original)
     assert run(conn, offline, "invoice_1004.json").status == Status.ESCALATED

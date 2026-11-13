@@ -17,7 +17,7 @@ The interface choices below were made by the agent while implementing, as the sk
 - [x] 1 identity: D40. 1012 is now keyed and paid under FastShip Ltd. (its registered name); gate and eval 27/27 pass; the `NOCASE` mutation fails 2 tests.
 - [x] 2 store transitions: D41. Crash, rollback and migration tests; writing the pending row after the bank call fails 4 tests; gate and eval 27/27 pass.
 - [x] 3 settlement: D42; D19 reworded. Human decisions now write DECIDED (the inbox tests were updated to expect it); gate and eval 27/27 pass.
-- [ ] 4 graph policy
+- [x] 4 graph policy: D43. graph.py went from 495 to 395 lines; the guardrail test that monkeypatched `route` was replaced by `test_settle`; gate and eval 27/27 pass.
 - [ ] 5 adapters
 - [ ] Fresh-context review of the stack, then merge
 

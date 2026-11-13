@@ -14,6 +14,7 @@ MAX_REVIEW_ROUNDS = 2
 FRAUD_LABEL = "suspected fraud"
 CHANGE_LABEL = "vendor change"
 VENDOR_MASTER_CHANGES = frozenset({"VENDOR_RENAMED"})
+REVISION_AFTER_PAYMENT = "revision_after_payment"
 
 
 @dataclass(frozen=True)
@@ -81,8 +82,13 @@ def _ids(findings: list[Finding], *severities: str) -> list[str]:
     return [f.rule_id for f in findings if f.severity in severities]
 
 
-def route(invoice: Invoice, findings: list[Finding], usd_total: Decimal | None) -> Route:
-    """Pick the approval path for a validated invoice (D7, D10, D27).
+def route(
+    invoice: Invoice, findings: list[Finding], usd_total: Decimal | None, amount_due: Decimal | None = None
+) -> Route:
+    """Pick the approval path for a validated invoice (D7, D10, D27, A8).
+
+    ``amount_due`` is set when this is a revision of an invoice already paid: whatever
+    the amount, the difference goes to a person rather than an agent.
 
     Order matters: hard findings reject first, so a fraud signal on an invoice
     that is invalid anyway does not cost a human's time.
@@ -108,6 +114,8 @@ def route(invoice: Invoice, findings: list[Finding], usd_total: Decimal | None) 
         return HumanReview(invoice, findings, usd_total, reason="total could not be determined in USD")
     if usd_total > HUMAN_ABOVE:
         return HumanReview(invoice, findings, usd_total, reason=f"total {usd_total} USD exceeds {HUMAN_ABOVE}")
+    if amount_due is not None:
+        return HumanReview(invoice, findings, usd_total, reason=REVISION_AFTER_PAYMENT)
     if usd_total >= AUTO_LIMIT or _ids(findings, "soft"):
         return VpReview(invoice, findings, usd_total)
     return AutoApprove(invoice, findings, usd_total)

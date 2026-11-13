@@ -7,7 +7,7 @@ from typing import Any
 
 import pytest
 
-from invoice_agents import approval, db, graph
+from invoice_agents import approval, graph
 from invoice_agents.agents import offline as offline_mod
 from invoice_agents.approval import AutoApprove, HumanReview, Reject, VpReview, guard, route
 from invoice_agents.models import Decision, Finding, Invoice, Status
@@ -119,16 +119,3 @@ def test_invented_citation_is_objected_in_code(conn: sqlite3.Connection, offline
     o, trace = run(conn, offline)
     crit = [t for t in trace if t["node"] == "critique"]
     assert "MADE_UP" in crit[0]["verdict"]["objections"][0] and o.status == Status.PAID
-
-
-def test_guardrail_overrides_reviewers(
-    conn: sqlite3.Connection, offline: Settings, goldens: Any, monkeypatch: pytest.MonkeyPatch
-):
-    """Even if a hard finding reached review, an agreed approval becomes a rejection."""
-    goldens("vp", [approve()])
-    goldens("critic", [{"agrees": True}])
-    hard = fnd("hard", "STOCK_EXCEEDED")
-    monkeypatch.setattr(approval, "route", lambda inv, f, t: VpReview(inv, [*f, hard], t))  # pyright: ignore
-    o, _ = run(conn, offline)
-    assert o.status == Status.REJECTED and o.decision is not None and o.decision.actor == "guardrail"
-    assert "guardrail_override" in [e["event"] for e in db.events(conn, "Precision Parts Ltd.", "INV-1004")]

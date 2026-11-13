@@ -169,14 +169,7 @@ async def reconcile_step(ctx: StepContext[State, Deps, Extracted]) -> Reconciled
     if (problems or doubts) and s.attempt < MAX_EXTRACT_RETRIES:
         return Retry("\n".join(problems + doubts))
     if problems:
-        s.findings.append(
-            Finding(
-                rule_id="ARITHMETIC_MISMATCH",
-                severity="hard",
-                message="; ".join(problems),
-                evidence={"attempts": s.attempt + 1},
-            )
-        )
+        s.findings.append(reconcile.mismatch_finding(problems, attempts=s.attempt + 1))
     assert s.doc is not None
     s.invoice, s.key, s.mismatches = inv, identity.key_for(ctx.deps.conn, inv, s.doc.file_sha256), problems
     return Reconciled(inv)
@@ -187,48 +180,15 @@ async def ledger_check(ctx: StepContext[State, Deps, Reconciled]) -> Reconciled 
     """Skip duplicates, supersede earlier revisions, and record receipt (D2, D25)."""
     s, d, inv = ctx.state, ctx.deps, ctx.inputs.invoice
     assert s.doc is not None and s.key is not None
-    found = ledger.check(d.conn, s.key, inv)
-    d.tracer.log("ledger", result=type(found).__name__)
-    received = {"path": s.doc.path, "sha256": s.doc.file_sha256, "format": s.doc.format}
-    if isinstance(found, ledger.Duplicate | ledger.Stale):
-        # The ledger row belongs to the copy already on file; events only, no status change.
-        db.record(d.conn, s.key, EventType.RECEIVED, actor="intake", run_id=s.run_id, payload=received)
-        why: dict[str, object] = (
-            {"duplicate_of": found.original_path, "original_status": found.original_status}
-            if isinstance(found, ledger.Duplicate)
-            else {"stale_revision": inv.revision, "current_revision": found.current_revision}
-        )
-        db.record(d.conn, s.key, EventType.DUPLICATE_SKIPPED, actor="ledger", run_id=s.run_id, payload=why)
-        if isinstance(found, ledger.Stale):
-            msg = f"revision {inv.revision} is older than revision {found.current_revision} on file"
-            s.findings.append(Finding(rule_id="STALE_REVISION", severity="soft", message=msg))
-        return DuplicateFound(inv, why)
-    if isinstance(found, ledger.Conflict):
-        # Keep the original's row intact: the conflicting copy gets its own ledger key.
-        s.key = identity.conflict_key(s.key, s.doc.file_sha256)
-        msg = f"same invoice number and revision as one on file, but {', '.join(found.fields)} differ"
-        s.findings.append(Finding(rule_id="DUPLICATE_NUMBER_CONFLICT", severity="fraud", message=msg,
-                                  evidence={"fields": found.fields}))  # fmt: skip
-    db.record(
-        d.conn, s.key, EventType.RECEIVED, actor="intake", run_id=s.run_id, payload=received,
-        status=Status.RECEIVED, source_path=s.doc.path, total=inv.total, currency=inv.currency,
-        core=json.dumps(ledger.core(inv)),
+    res = ledger.intake(
+        d.conn, s.key, inv, run_id=s.run_id,
+        source={"path": s.doc.path, "sha256": s.doc.file_sha256, "format": s.doc.format},
+        extracted={"model": s.model_name, "attempts": s.attempt + 1, "mismatches": s.mismatches},
     )  # fmt: skip
-    if isinstance(found, ledger.Revision):
-        db.withdraw_inbox(d.conn, s.key, found.open_inbox_ids, s.run_id)
-        db.record(
-            d.conn, s.key, EventType.SUPERSEDED, actor="ledger", run_id=s.run_id,
-            payload={"previous_revision": found.previous_revision, "revision": inv.revision,
-                     "already_paid": str(found.already_paid), **found.changes},
-        )  # fmt: skip
-        if found.already_paid > 0 and inv.total is not None:
-            s.amount_due = inv.total - found.already_paid
-    db.record(
-        d.conn, s.key, EventType.EXTRACTED, actor="extractor", run_id=s.run_id,
-        payload={"model": s.model_name, "attempts": s.attempt + 1, "mismatches": s.mismatches},
-        status=Status.EXTRACTED,
-    )  # fmt: skip
-    return Reconciled(inv)
+    d.tracer.log("ledger", result=res.verdict)
+    s.key, s.amount_due = res.key, res.amount_due
+    s.findings += res.findings
+    return DuplicateFound(inv, res.skipped) if res.skipped is not None else Reconciled(inv)
 
 
 @g.step
@@ -258,11 +218,10 @@ async def validate(ctx: StepContext[State, Deps, Reconciled]) -> approval.Route:
     s.findings += rules.validate(inv, d.conn, d.settings.as_of, s.doc.text if s.doc else "")
     s.findings += ledger.split_findings(d.conn, s.key, inv, approval.AUTO_LIMIT)
     db.record_findings(d.conn, s.key, s.run_id, s.findings)
-    r = approval.route(inv, s.findings, fx.to_usd(inv.total, inv.currency, fx.rates(d.conn)))
-    if s.amount_due is not None and isinstance(r, AutoApprove | VpReview):
+    r = approval.route(inv, s.findings, fx.to_usd(inv.total, inv.currency, fx.rates(d.conn)), s.amount_due)
+    if isinstance(r, HumanReview) and r.reason == approval.REVISION_AFTER_PAYMENT:
         db.record(d.conn, s.key, EventType.REVISION_AFTER_PAYMENT, actor="ledger", run_id=s.run_id,
                   payload={"amount_due": str(s.amount_due)})  # fmt: skip
-        r = HumanReview(inv, r.findings, r.usd_total, reason="revision_after_payment")
     d.tracer.log("route", route=type(r).__name__, findings=[f.rule_id for f in s.findings])
     return r
 

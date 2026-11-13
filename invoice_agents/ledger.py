@@ -12,8 +12,8 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Any
 
-from invoice_agents import identity
-from invoice_agents.models import Finding, Invoice, InvoiceKey
+from invoice_agents import db, identity
+from invoice_agents.models import EventType, Finding, Invoice, InvoiceKey, Status
 
 CORE_FIELDS = ("vendor", "invoice_number", "revision", "invoice_date", "due_date", "total", "lines")
 
@@ -147,3 +147,87 @@ def already_paid(conn: sqlite3.Connection, vendor: str, invoice_number: str) -> 
     """Total paid so far across every revision and copy of one invoice (B7: conflicts count too)."""
     rows = conn.execute("SELECT invoice_number, amount_paid FROM payments WHERE vendor=?", (vendor,)).fetchall()
     return sum((Decimal(r[1]) for r in rows if identity.same_invoice(r[0], invoice_number)), Decimal(0))
+
+
+@dataclass(frozen=True)
+class Intake:
+    """What receiving an invoice into the ledger decided.
+
+    Attributes:
+        key: The key to process under (a conflicting copy gets its own).
+        verdict: Name of the ledger check result, for the trace.
+        skipped: Why the invoice is not processed further (duplicate or stale), else ``None``.
+        findings: Findings the ledger raises (STALE_REVISION, DUPLICATE_NUMBER_CONFLICT).
+        amount_due: For a revision of a paid invoice, what is still owed; else ``None``.
+    """
+
+    key: InvoiceKey
+    verdict: str
+    skipped: dict[str, object] | None = None
+    findings: list[Finding] = field(default_factory=list[Finding])
+    amount_due: Decimal | None = None
+
+
+def intake(
+    conn: sqlite3.Connection,
+    key: InvoiceKey,
+    inv: Invoice,
+    *,
+    source: dict[str, str],
+    run_id: str,
+    extracted: dict[str, object],
+) -> Intake:
+    """Check an extracted invoice against the ledger and record its receipt (D2, D25).
+
+    Duplicates and stale revisions get RECEIVED and DUPLICATE_SKIPPED events and leave the
+    status row of the copy on file alone. Everything else is recorded RECEIVED then EXTRACTED;
+    a conflicting copy gets its own key, and a revision supersedes the original and withdraws
+    its open inbox items.
+
+    Args:
+        conn: Open connection.
+        key: Key from :func:`identity.key_for`.
+        inv: The reconciled invoice.
+        source: ``path``, ``sha256`` and ``format`` of the file.
+        run_id: Current run.
+        extracted: Payload for the EXTRACTED event (model, attempts, mismatches).
+    """
+    found = check(conn, key, inv)
+    verdict = type(found).__name__
+    if isinstance(found, Duplicate | Stale):
+        db.record(conn, key, EventType.RECEIVED, actor="intake", run_id=run_id, payload=dict(source))
+        why: dict[str, object] = (
+            {"duplicate_of": found.original_path, "original_status": found.original_status}
+            if isinstance(found, Duplicate)
+            else {"stale_revision": inv.revision, "current_revision": found.current_revision}
+        )
+        db.record(conn, key, EventType.DUPLICATE_SKIPPED, actor="ledger", run_id=run_id, payload=why)
+        findings = []
+        if isinstance(found, Stale):
+            msg = f"revision {inv.revision} is older than revision {found.current_revision} on file"
+            findings.append(Finding(rule_id="STALE_REVISION", severity="soft", message=msg))
+        return Intake(key, verdict, skipped=why, findings=findings)
+    findings: list[Finding] = []
+    if isinstance(found, Conflict):
+        key = identity.conflict_key(key, source["sha256"])
+        msg = f"same invoice number and revision as one on file, but {', '.join(found.fields)} differ"
+        findings.append(Finding(rule_id="DUPLICATE_NUMBER_CONFLICT", severity="fraud", message=msg,
+                                evidence={"fields": found.fields}))  # fmt: skip
+    db.record(
+        conn, key, EventType.RECEIVED, actor="intake", run_id=run_id, payload=dict(source),
+        status=Status.RECEIVED, source_path=source["path"], total=inv.total, currency=inv.currency,
+        core=json.dumps(core(inv)),
+    )  # fmt: skip
+    amount_due = None
+    if isinstance(found, Revision):
+        db.withdraw_inbox(conn, key, found.open_inbox_ids, run_id)
+        db.record(
+            conn, key, EventType.SUPERSEDED, actor="ledger", run_id=run_id,
+            payload={"previous_revision": found.previous_revision, "revision": inv.revision,
+                     "already_paid": str(found.already_paid), **found.changes},
+        )  # fmt: skip
+        if found.already_paid > 0 and inv.total is not None:
+            amount_due = inv.total - found.already_paid
+    db.record(conn, key, EventType.EXTRACTED, actor="extractor", run_id=run_id, payload=extracted,
+              status=Status.EXTRACTED)  # fmt: skip
+    return Intake(key, verdict, findings=findings, amount_due=amount_due)

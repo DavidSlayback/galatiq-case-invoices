@@ -8,7 +8,7 @@ import re
 from datetime import timedelta
 from decimal import Decimal
 
-from invoice_agents.models import Invoice
+from invoice_agents.models import Finding, Invoice
 
 CENT = Decimal("0.01")
 
@@ -79,3 +79,9 @@ def mismatches(inv: Invoice) -> list[str]:
                 f" stated total {inv.total}"
             )
     return out
+
+
+def mismatch_finding(problems: list[str], attempts: int) -> Finding:
+    """The hard finding for arithmetic that still does not add up after the retry budget (D14)."""
+    return Finding(rule_id="ARITHMETIC_MISMATCH", severity="hard", message="; ".join(problems),
+                   evidence={"attempts": attempts})  # fmt: skip
