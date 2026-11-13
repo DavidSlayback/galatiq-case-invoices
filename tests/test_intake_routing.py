@@ -42,8 +42,9 @@ def test_intake_records_a_new_invoice_and_skips_its_copy(conn: sqlite3.Connectio
 def test_intake_of_a_paid_invoice_revision_reports_what_is_owed(conn: sqlite3.Connection):
     key = identity.key_for(conn, inv(), SRC["sha256"])
     ledger.intake(conn, key, inv(), source=SRC, run_id="r1", extracted={})
-    db.start_payment(conn, key, Decimal(250), "USD", Decimal(250))
-    db.settle_payment(conn, key, run_id="r1", actor="t", payload={})
+    attempt = db.start_payment(conn, key, Decimal(250), "USD", Decimal(250))
+    assert attempt == 1
+    db.settle_payment(conn, key, attempt, run_id="r1", actor="t", payload={})
     rev = inv(total="400", revision=1)
     out = ledger.intake(conn, key._replace(revision=1), rev, source=SRC, run_id="r2", extracted={})
     assert out.verdict == "Revision" and out.amount_due == Decimal(150)

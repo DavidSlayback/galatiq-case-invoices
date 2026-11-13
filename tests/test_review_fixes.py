@@ -116,3 +116,33 @@ def test_r12_a_refusal_after_the_sweep_leaves_no_orphan_item(conn: sqlite3.Conne
 
     payment.pay(conn, key, Decimal(100), "USD", None, "r1", flagged_then_declined)
     assert [i.reason for i in inbox.list_open(conn)] == ["payment_failed"]
+
+
+def test_r13_a_payment_another_process_holds_never_calls_the_bank(conn: sqlite3.Connection):
+    key = InvoiceKey("Widgets Inc.", "INV-8", 0)
+    assert db.start_payment(conn, key, Decimal(100), "USD", Decimal(100)) == 1  # the other process
+    assert db.start_payment(conn, key, Decimal(100), "USD", Decimal(100)) is None  # this one: refused
+
+
+def test_r14_a_late_success_after_the_retry_is_recorded_as_an_overpayment(conn: sqlite3.Connection):
+    """Live call flagged and cancelled, retry approved and sent, then the first call succeeds."""
+    key = InvoiceKey("Widgets Inc.", "INV-9", 0)
+    db.record(conn, key, EventType.RECEIVED, actor="t", run_id="r", status=Status.RECEIVED, total="100")
+    sent: list[Decimal] = []
+
+    def ok(vendor: str, amount: Decimal) -> dict[str, str]:
+        sent.append(amount)
+        return {"status": "success"}
+
+    def slow_bank(vendor: str, amount: Decimal) -> dict[str, str]:
+        sent.append(amount)
+        age_pending(conn)
+        inbox.list_open(conn)
+        inbox.resolve(conn, "INV-9", approve=False, note="not there", reviewer="human:t")
+        inbox.resolve(conn, "INV-9", approve=True, note="retry", reviewer="human:t", bank=ok)  # send 2
+        return {"status": "success"}  # send 1 lands late
+
+    payment.pay(conn, key, Decimal(100), "USD", None, "r1", slow_bank)
+    assert sent == [Decimal(100), Decimal(100)]
+    assert ledger.already_paid(conn, key.vendor, key.invoice_number) == Decimal(200)  # the ledger tells the truth
+    assert [i.reason for i in inbox.list_open(conn)] == ["overpayment"]
