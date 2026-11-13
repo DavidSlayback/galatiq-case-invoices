@@ -70,9 +70,7 @@ def test_older_revision_after_newer_is_stale(conn: sqlite3.Connection, offline: 
     assert old.status == Status.DUPLICATE_SKIPPED and "STALE_REVISION" in [f.rule_id for f in old.findings]
 
 
-def test_same_number_different_content_is_a_fraud_conflict(
-    conn: sqlite3.Connection, offline: Settings, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-):
+def test_same_number_different_content_is_a_fraud_conflict(conn: sqlite3.Connection, offline: Settings, tmp_path: Path):
     gdir = tmp_path / "golden" / "extract"
     gdir.mkdir(parents=True)
     for src in (ROOT / "fixtures/golden/extract").glob("invoice_1004_json.json"):
