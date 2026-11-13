@@ -16,7 +16,7 @@ from invoice_agents import db, ledger
 from invoice_agents.models import EventType, InvoiceKey, Status
 
 ATTEMPTS = 2  # A7
-UNCONFIRMED = "payment_unconfirmed"
+UNCONFIRMED = db.UNCONFIRMED_REASON
 STALE_AFTER = timedelta(minutes=2)  # far longer than a bank call; a pending row this old has no live process
 
 Bank = Callable[[str, Decimal], dict[str, str]]
@@ -68,7 +68,7 @@ def pay(
     if state and state[0] == "sent":
         db.record(conn, key, EventType.PAYMENT_SKIPPED_ALREADY_PAID, actor="payment", run_id=run_id)
         return PaymentResult(Status.PAID, Decimal(0))
-    if state:  # pending: an earlier attempt died after (or before) calling the bank, so never guess
+    if state and state[0] == "pending":  # an earlier attempt died after (or before) the bank call: never guess
         _unconfirmed(conn, key, state[1], run_id, "an earlier attempt did not finish")
         return PaymentResult(Status.ESCALATED, state[1])
     amount = total - ledger.already_paid(conn, key.vendor, key.invoice_number)

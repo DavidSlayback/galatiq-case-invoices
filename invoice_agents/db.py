@@ -74,7 +74,10 @@ def connect(path: Path | str) -> sqlite3.Connection:
     old = conn.execute("SELECT sql FROM sqlite_master WHERE name='invoices'").fetchone()
     if old and "NOCASE" in old[0]:  # keys made before D40 would not meet their new spellings: refuse, never re-pay
         conn.close()
-        raise RuntimeError(f"{path} predates the FOLD identity rule (D40); run `python main.py reset` to rebuild it")
+        raise RuntimeError(
+            f"{path} predates the FOLD identity rule (D40). `python main.py reset` rebuilds it but erases its payment"
+            " history, so files already paid would be paid again if reprocessed; keep the old file to check against."
+        )
     conn.executescript(SCHEMA)
     # FOLD's order comes from Python's Unicode tables: rebuild the key indexes if they changed.
     ver = conn.execute("SELECT value FROM meta WHERE key='unicode'").fetchone()
@@ -184,6 +187,17 @@ def _enqueue(
     _record(conn, key, EventType.ESCALATED, actor, run_id, payload, Status.ESCALATED, {})
 
 
+UNCONFIRMED_REASON = "payment_unconfirmed"
+
+
+def _close_items(conn: sqlite3.Connection, key: InvoiceKey, reason: str, note: str) -> None:
+    conn.execute(
+        "UPDATE inbox SET status='withdrawn', resolved_ts=?, note=?"
+        " WHERE vendor=? AND invoice_number=? AND revision=? AND reason=? AND status='open'",
+        (now(), note, *key, reason),
+    )
+
+
 def _opt(d: Decimal | None) -> str | None:
     return None if d is None else str(d)
 
@@ -223,11 +237,18 @@ def payment_state(conn: sqlite3.Connection, key: InvoiceKey) -> tuple[str, Decim
 
 
 def start_payment(conn: sqlite3.Connection, key: InvoiceKey, amount: Decimal, currency: str, usd: Decimal) -> None:
-    """Write the pending payment row before the bank is called, so a crash after the call leaves evidence."""
+    """Write the pending payment row before the bank is called, so a crash after the call leaves evidence.
+
+    A cancelled row for the same revision is reused for the retry.
+    """
     with conn:
         conn.execute(
             "INSERT INTO payments (vendor, invoice_number, revision, amount_paid, currency, usd_equivalent, ts, status)"
-            " VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')",
+            " VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')"
+            " ON CONFLICT (vendor, invoice_number, revision) DO UPDATE SET status='pending',"
+            " amount_paid=excluded.amount_paid, currency=excluded.currency,"
+            " usd_equivalent=excluded.usd_equivalent, ts=excluded.ts"
+            " WHERE payments.status='cancelled'",
             (*key, str(amount), currency, str(usd), now()),
         )
 
@@ -235,28 +256,40 @@ def start_payment(conn: sqlite3.Connection, key: InvoiceKey, amount: Decimal, cu
 def settle_payment(
     conn: sqlite3.Connection, key: InvoiceKey, *, run_id: str, actor: str, payload: dict[str, Any]
 ) -> None:
-    """Mark the pending payment sent, record PAID and close any unconfirmed-payment item, in one transaction."""
+    """Mark the payment sent, record PAID and close its open payment items, in one transaction.
+
+    A row a reviewer already cancelled is still marked sent: the bank answered late, the money
+    left, and the queued retry must now see it as paid (the PAID event says so).
+    """
     with conn:
+        prior = conn.execute(
+            "SELECT status FROM payments WHERE vendor=? AND invoice_number=? AND revision=?", tuple(key)
+        ).fetchone()
         conn.execute(
             "UPDATE payments SET status='sent', ts=? WHERE vendor=? AND invoice_number=? AND revision=?",
             (now(), *key),
         )
-        conn.execute(
-            "UPDATE inbox SET status='withdrawn', resolved_ts=?, note='payment confirmed'"
-            " WHERE vendor=? AND invoice_number=? AND revision=? AND reason='payment_unconfirmed' AND status='open'",
-            (now(), *key),
-        )
+        _close_items(conn, key, UNCONFIRMED_REASON, "payment confirmed")
+        if prior is not None and prior[0] == "cancelled":
+            _close_items(conn, key, "payment_failed", "bank confirmed the payment after it was cancelled")
+            payload = {**payload, "late_after_cancel": True}
         _record(conn, key, EventType.PAID, actor, run_id, payload, Status.PAID, {})
 
 
 def fail_payment(
     conn: sqlite3.Connection, key: InvoiceKey, *, run_id: str, actor: str, amount: Decimal, payload: dict[str, Any]
 ) -> None:
-    """Drop the pending row, record PAYMENT_FAILED and queue the invoice for a person, in one transaction."""
+    """Cancel the pending row, record PAYMENT_FAILED and queue a retry for a person, in one transaction.
+
+    The row is kept as ``cancelled`` (not deleted) so a bank call that succeeds late still finds it.
+    """
     with conn:
         conn.execute(
-            "DELETE FROM payments WHERE vendor=? AND invoice_number=? AND revision=? AND status='pending'", tuple(key)
+            "UPDATE payments SET status='cancelled', ts=?"
+            " WHERE vendor=? AND invoice_number=? AND revision=? AND status='pending'",
+            (now(), *key),
         )
+        _close_items(conn, key, UNCONFIRMED_REASON, "payment failed")
         _record(conn, key, EventType.PAYMENT_FAILED, actor, run_id, payload, Status.PAYMENT_FAILED, {})
         _enqueue(conn, key, "payment_failed", run_id, actor, None, amount, {"errors": payload.get("errors", [])})
 

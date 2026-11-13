@@ -7,9 +7,9 @@ from pathlib import Path
 
 import pytest
 
-from invoice_agents import db, graph, inbox, ledger
+from invoice_agents import db, graph, inbox, ledger, payment
 from invoice_agents.identity import key_for
-from invoice_agents.models import InvoiceKey, Status
+from invoice_agents.models import EventType, InvoiceKey, Status
 from invoice_agents.normalize import RawExtraction, to_invoice
 from invoice_agents.settings import Settings
 from tests.conftest import INVOICES, ROOT
@@ -85,3 +85,34 @@ def test_r10_an_alias_name_finds_the_inbox_item(conn: sqlite3.Connection, offlin
     graph.process_sync(INVOICES / "invoice_1012.txt", offline, conn)
     out = inbox.resolve(conn, "1012", approve=False, note="no", reviewer="human:t", vendor="QuickShip Distributers")
     assert out == {"status": "rejected"}
+
+
+def test_r11_a_late_bank_success_after_cancel_is_never_sent_again(conn: sqlite3.Connection):
+    """The sweep flags a slow call, a reviewer cancels, then the bank answers success."""
+    key = InvoiceKey("Widgets Inc.", "INV-6", 0)
+    db.record(conn, key, EventType.RECEIVED, actor="t", run_id="r", status=Status.RECEIVED, total="100")
+    sent: list[Decimal] = []
+
+    def slow_bank(vendor: str, amount: Decimal) -> dict[str, str]:
+        sent.append(amount)
+        age_pending(conn)
+        assert [i.reason for i in inbox.list_open(conn)] == ["payment_unconfirmed"]  # the sweep flags the live call
+        inbox.resolve(conn, "INV-6", approve=False, note="not on statement yet", reviewer="human:t")
+        return {"status": "success"}  # and then the money leaves after all
+
+    payment.pay(conn, key, Decimal(100), "USD", None, "r1", slow_bank)
+    assert db.payment_state(conn, key) == ("sent", Decimal(100)) and inbox.list_open(conn) == []
+    assert payment.pay(conn, key, Decimal(100), "USD", None, "r2", slow_bank).amount == Decimal(0)
+    assert sent == [Decimal(100)]
+
+
+def test_r12_a_refusal_after_the_sweep_leaves_no_orphan_item(conn: sqlite3.Connection):
+    key = InvoiceKey("Widgets Inc.", "INV-7", 0)
+
+    def flagged_then_declined(vendor: str, amount: Decimal) -> dict[str, str]:
+        age_pending(conn)
+        inbox.list_open(conn)
+        return {"status": "declined"}
+
+    payment.pay(conn, key, Decimal(100), "USD", None, "r1", flagged_then_declined)
+    assert [i.reason for i in inbox.list_open(conn)] == ["payment_failed"]

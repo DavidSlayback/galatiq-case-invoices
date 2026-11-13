@@ -156,8 +156,10 @@ def split_findings(conn: sqlite3.Connection, key: InvoiceKey, inv: Invoice, limi
 
 
 def already_paid(conn: sqlite3.Connection, vendor: str, invoice_number: str) -> Decimal:
-    """Total paid so far across every revision and copy of one invoice (B7: conflicts count too)."""
-    rows = conn.execute("SELECT invoice_number, amount_paid FROM payments WHERE vendor=?", (vendor,)).fetchall()
+    """Total paid or possibly paid (pending) across every revision and copy of one invoice (B7)."""
+    rows = conn.execute(
+        "SELECT invoice_number, amount_paid FROM payments WHERE vendor=? AND status<>'cancelled'", (vendor,)
+    ).fetchall()
     return sum((Decimal(r[1]) for r in rows if identity.same_invoice(r[0], invoice_number)), Decimal(0))
 
 

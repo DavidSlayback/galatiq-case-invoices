@@ -44,7 +44,7 @@ def test_refusals_retry_then_escalate(conn: sqlite3.Connection):
     res = payment.pay(conn, KEY, Decimal("100"), "USD", None, "r1", bank)
     assert res.status == Status.PAYMENT_FAILED and len(calls) == payment.ATTEMPTS == 2
     assert conn.execute("SELECT reason FROM inbox").fetchone()[0] == "payment_failed"
-    assert conn.execute("SELECT count(*) FROM payments").fetchone()[0] == 0
+    assert db.payment_state(conn, KEY) == ("cancelled", Decimal("100"))  # kept, but never counted as paid
 
 
 def test_an_exception_is_ambiguous_so_it_is_never_retried(conn: sqlite3.Connection):

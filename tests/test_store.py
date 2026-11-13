@@ -57,7 +57,7 @@ def test_reviewer_cancels_then_approves_the_retry_which_pays_once(conn: sqlite3.
     crash_after_bank(conn)
     payment.pay(conn, KEY, Decimal(100), "USD", None, "r2", recording_bank({"status": "success"})[0])
     out = inbox.resolve(conn, KEY.invoice_number, approve=False, note="not on statement", reviewer="human:t")
-    assert out["status"] == "payment_failed" and db.payment_state(conn, KEY) is None
+    assert out["status"] == "payment_failed" and db.payment_state(conn, KEY) == ("cancelled", Decimal(100))
     (item,) = inbox.list_open(conn)
     assert item.reason == "payment_failed"
     inbox.resolve(conn, KEY.invoice_number, approve=True, note="retry", reviewer="human:t")
