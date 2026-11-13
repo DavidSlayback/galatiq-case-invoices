@@ -1,6 +1,6 @@
 # Live model results
 
-Every sample and adversarial invoice (27 files) was run against real models through the subscription CLIs (D31). The current results are from 2026-11-13, on the code with the review agents' tools (D48, D49). Scorecards: [Grok](scorecard-grok.md) · [Haiku](scorecard-haiku.md). Each extraction is recorded under `fixtures/recorded/<backend>/`.
+Every sample and adversarial invoice (27 files) was run against real models through the subscription CLIs (D31). The current results are from 2026-11-13, on the code with the review agents' tools (D48, D49). Scorecards: [Grok](scorecard-grok.md) · [Haiku](scorecard-haiku.md) · [every tool call](tool-calls.md). Each extraction is recorded under `fixtures/recorded/<backend>/`.
 
 | Backend | Result | Core fields vs goldens | Model calls | Tool calls by the VP and critic | Tokens | Time |
 |---|---|---|---|---|---|---|
