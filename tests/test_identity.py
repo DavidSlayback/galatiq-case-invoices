@@ -11,10 +11,7 @@ from typer.testing import CliRunner
 from invoice_agents import db, identity, ledger, payment
 from invoice_agents.cli import app
 from invoice_agents.models import EventType, Invoice, InvoiceKey, LineItem, Status
-
-
-def OK(vendor: str, amount: Decimal) -> dict[str, str]:
-    return {"status": "success"}
+from tests.conftest import ok
 
 
 def inv(vendor: str, number: str = "INV-7100") -> Invoice:
@@ -48,7 +45,7 @@ def _pay_first(conn: sqlite3.Connection, vendor: str) -> InvoiceKey:
     first = identity.key_for(conn, inv(vendor), "a" * 64)
     db.record(conn, first, EventType.RECEIVED, actor="t", run_id="r", status=Status.RECEIVED,
               core=__import__("json").dumps(ledger.core(inv(vendor))))  # fmt: skip
-    payment.pay(conn, first, Decimal(250), "USD", None, "r", OK)
+    payment.pay(conn, first, Decimal(250), "USD", None, "r", ok)
     return first
 
 
@@ -91,8 +88,8 @@ def test_lookalike_is_never_resolved_to_the_real_vendor(conn: sqlite3.Connection
 
 def test_conflict_copy_shares_payments_but_wildcards_do_not(conn: sqlite3.Connection):
     k = InvoiceKey("Widgets Inc.", "INV-1", 0)
-    payment.pay(conn, k, Decimal(1000), "USD", None, "r", OK)
-    payment.pay(conn, InvoiceKey("Widgets Inc.", "INV-10", 0), Decimal(7), "USD", None, "r", OK)
+    payment.pay(conn, k, Decimal(1000), "USD", None, "r", ok)
+    payment.pay(conn, InvoiceKey("Widgets Inc.", "INV-10", 0), Decimal(7), "USD", None, "r", ok)
     assert ledger.already_paid(conn, k.vendor, identity.conflict_key(k, "f" * 64).invoice_number) == Decimal(1000)
     assert ledger.already_paid(conn, k.vendor, "INV-1%") == Decimal(0)  # no LIKE wildcard
 

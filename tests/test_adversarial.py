@@ -32,11 +32,6 @@ def test_every_attack_carries_a_fraud_finding(conn: sqlite3.Connection, offline:
         assert o.decision is not None and o.decision.label == "suspected fraud"
 
 
-@pytest.fixture
-def ref(conn: sqlite3.Connection) -> Reference:
-    return Reference.load(conn)
-
-
 def inv(**kw: object) -> Invoice:
     base = Invoice(
         vendor="Widgets Inc.", invoice_number="INV-X", invoice_date=date(2026, 1, 26), due_date=date(2026, 2, 25),

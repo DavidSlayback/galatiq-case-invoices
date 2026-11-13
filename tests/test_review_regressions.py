@@ -13,7 +13,7 @@ from invoice_agents.agents import cli_bridge
 from invoice_agents.models import EventType, Invoice, InvoiceKey, LineItem, Status
 from invoice_agents.rules import Reference, check
 from invoice_agents.settings import DEFAULT_AS_OF, Settings
-from tests.conftest import INVOICES
+from tests.conftest import INVOICES, ok, recording_bank
 
 
 def inv(**kw: Any) -> Invoice:
@@ -30,15 +30,10 @@ def test_b1_vendor_spelling_variants_share_one_ledger_key(conn: sqlite3.Connecti
     first = identity.key_for(conn, inv(), "a" * 64)
     db.record(conn, first, EventType.RECEIVED, actor="t", run_id="r", status=Status.RECEIVED,
               core=__import__("json").dumps(ledger.core(inv())))  # fmt: skip
-    payment.pay(conn, first, Decimal(250), "USD", None, "r", lambda v, a: {"status": "success"})
+    payment.pay(conn, first, Decimal(250), "USD", None, "r", ok)
     again = identity.key_for(conn, inv(vendor=variant), "b" * 64)
     assert isinstance(ledger.check(conn, again, inv(vendor=variant)), ledger.Duplicate | ledger.Conflict)
     assert ledger.already_paid(conn, again.vendor, again.invoice_number) == Decimal(250)
-
-
-@pytest.fixture
-def ref(conn: sqlite3.Connection) -> Reference:
-    return Reference.load(conn)
 
 
 def ids(i: Invoice, ref: Reference, text: str = "") -> list[str]:
@@ -85,12 +80,7 @@ def test_b6_non_positive_totals_and_prices_are_hard(ref: Reference):
 
 
 def test_b6_lower_revision_after_payment_never_calls_the_bank(conn: sqlite3.Connection):
-    calls: list[Decimal] = []
-
-    def bank(vendor: str, amount: Decimal) -> dict[str, str]:
-        calls.append(amount)
-        return {"status": "success"}
-
+    bank, calls = recording_bank({"status": "success"})
     k = InvoiceKey("Widgets Inc.", "INV-1", 0)
     payment.pay(conn, k, Decimal(1000), "USD", None, "r", bank)
     res = payment.pay(conn, k._replace(revision=1), Decimal(600), "USD", None, "r", bank)
@@ -100,7 +90,7 @@ def test_b6_lower_revision_after_payment_never_calls_the_bank(conn: sqlite3.Conn
 
 def test_b7_conflict_copy_counts_what_the_original_was_paid(conn: sqlite3.Connection):
     k = InvoiceKey("Widgets Inc.", "INV-1", 0)
-    payment.pay(conn, k, Decimal(1000), "USD", None, "r", lambda v, a: {"status": "success"})
+    payment.pay(conn, k, Decimal(1000), "USD", None, "r", ok)
     assert ledger.already_paid(conn, k.vendor, identity.conflict_key(k, "abcd1234" * 8).invoice_number) == Decimal(1000)
 
 

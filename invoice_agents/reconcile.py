@@ -8,9 +8,8 @@ import re
 from datetime import timedelta
 from decimal import Decimal
 
+from invoice_agents.fx import CENT
 from invoice_agents.models import Finding, Invoice
-
-CENT = Decimal("0.01")
 
 
 def net_days(terms: str | None) -> int | None:

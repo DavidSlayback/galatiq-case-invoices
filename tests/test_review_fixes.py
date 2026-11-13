@@ -12,19 +12,11 @@ from invoice_agents.identity import key_for
 from invoice_agents.models import EventType, InvoiceKey, Status
 from invoice_agents.normalize import RawExtraction, to_invoice
 from invoice_agents.settings import Settings
-from tests.conftest import INVOICES, ROOT
-
-
-class Crash(BaseException):
-    """The process dying mid-call."""
+from tests.conftest import INVOICES, ROOT, Crash, declined
 
 
 def crash(vendor: str, amount: Decimal) -> dict[str, str]:
     raise Crash
-
-
-def declined(vendor: str, amount: Decimal) -> dict[str, str]:
-    return {"status": "declined"}
 
 
 def age_pending(conn: sqlite3.Connection) -> None:

@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from datetime import timedelta
 from decimal import Decimal
 
-from invoice_agents import db, ledger
+from invoice_agents import db, fx, ledger
 from invoice_agents.models import EventType, InvoiceKey, Status
 
 ATTEMPTS = 2  # A7
@@ -77,7 +77,7 @@ def pay(
                   payload={"credit_due": str(-amount)})  # fmt: skip
         return PaymentResult(Status.PAID, Decimal(0))
     # Scale the USD figure to the amount actually sent (a revision delta pays only part of the total).
-    usd = (amount * usd_equivalent / total).quantize(Decimal("0.01")) if usd_equivalent and total else amount
+    usd = (amount * usd_equivalent / total).quantize(fx.CENT) if usd_equivalent and total else amount
     attempt = db.start_payment(conn, key, amount, currency, usd)
     if attempt is None:  # another process claimed this payment between our check and now: never call the bank
         return PaymentResult(Status.ESCALATED, amount)
@@ -102,12 +102,7 @@ def pay(
 
 def confirm_pending(conn: sqlite3.Connection, key: InvoiceKey, run_id: str, actor: str) -> PaymentResult:
     """A person saw the unconfirmed payment at the bank: settle it without sending again."""
-    state = db.payment_state(conn, key)
-    if state is None or state[0] != "pending":
-        raise ValueError(f"no unconfirmed payment for {key}")
-    amount = state[1]
-    attempt = db.payment_attempt(conn, key)
-    assert attempt is not None
+    amount, attempt = _pending(conn, key)
     db.settle_payment(conn, key, attempt, run_id=run_id, actor=actor,
                       payload={"amount": amount, "confirmed_at_bank": True})  # fmt: skip
     return PaymentResult(Status.PAID, amount)
@@ -115,15 +110,17 @@ def confirm_pending(conn: sqlite3.Connection, key: InvoiceKey, run_id: str, acto
 
 def cancel_pending(conn: sqlite3.Connection, key: InvoiceKey, run_id: str, actor: str) -> PaymentResult:
     """A person found no such payment at the bank: clear it; approving the new inbox item retries it."""
-    state = db.payment_state(conn, key)
-    if state is None or state[0] != "pending":
-        raise ValueError(f"no unconfirmed payment for {key}")
-    amount = state[1]
-    attempt = db.payment_attempt(conn, key)
-    assert attempt is not None
+    amount, attempt = _pending(conn, key)
     db.fail_payment(conn, key, attempt, run_id=run_id, actor=actor, amount=amount,
                     payload={"amount": amount, "errors": ["not found at the bank"]})  # fmt: skip
     return PaymentResult(Status.PAYMENT_FAILED, amount)
+
+
+def _pending(conn: sqlite3.Connection, key: InvoiceKey) -> tuple[Decimal, int]:
+    found = db.pending_payment(conn, key)
+    if found is None:
+        raise ValueError(f"no unconfirmed payment for {key}")
+    return found
 
 
 def _unconfirmed(conn: sqlite3.Connection, key: InvoiceKey, amount: Decimal, run_id: str, why: str) -> None:

@@ -102,9 +102,7 @@ Check = New | Duplicate | Conflict | Revision | Stale
 
 def check(conn: sqlite3.Connection, key: InvoiceKey, inv: Invoice) -> Check:
     """Compare an extracted invoice with what the ledger already holds for its vendor and number."""
-    row = conn.execute(
-        "SELECT * FROM invoices WHERE vendor=? AND invoice_number=?", (key.vendor, key.invoice_number)
-    ).fetchone()
+    row = db.invoice_row(conn, key.vendor, key.invoice_number)
     if row is None or row["core"] is None:
         return New()
     old, new = json.loads(row["core"]), core(inv)
