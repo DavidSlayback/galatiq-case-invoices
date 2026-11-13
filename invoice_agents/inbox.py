@@ -140,7 +140,7 @@ def resolve(
         bank: Payment adapter.
 
     Returns:
-        ``{"status": ...}`` plus ``"amount"`` (attempted or recovered) unless rejected.
+        ``{"status": ...}`` plus ``"amount"`` (attempted or recovered) unless the invoice was rejected.
 
     Raises:
         InboxError: Missing note, unknown or closed item, ambiguous vendor, a payment no longer

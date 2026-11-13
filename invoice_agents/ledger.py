@@ -108,10 +108,10 @@ _IN_FLIGHT = ("received", "extracted", "validated", "escalated")
 def _interrupted(conn: sqlite3.Connection, key: InvoiceKey, row: sqlite3.Row) -> bool:
     """A run died after recording this invoice but before it reached an outcome (D46).
 
-    True only when nothing else will finish it: the row has not moved for longer than
-    a run takes, no inbox item is open, and no payment was started (a pending payment
-    is the payment sweep's job). Re-running the file then processes it again instead
-    of skipping it as a duplicate, so the invoice is never silently stuck.
+    True when the status row has not moved for ``db.STALE_AFTER``, no inbox item is open,
+    and no payment was started for this revision (a pending payment is the payment sweep's
+    job). Re-running the file then processes it again instead of skipping it as a duplicate.
+    The threshold is a heuristic: a live run whose agent calls take longer also qualifies.
     """
     if row["status"] not in _IN_FLIGHT or not db.is_stale(row["updated_at"]):
         return False

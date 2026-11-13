@@ -8,6 +8,23 @@ import streamlit as st
 from app.common import chip, conn, settings
 from invoice_agents import inbox
 
+# (approve label, reject label, help) by inbox reason: approving a payment item sends nothing new.
+DEFAULT_BUTTONS = ("Approve and pay", "Reject", "")
+BUTTONS = {
+    "payment_unconfirmed": (
+        "Confirm it reached the bank",
+        "Not at the bank: cancel",
+        "Check the bank first. Confirming records the payment without sending it again;"
+        " cancelling queues a retry for review.",
+    ),
+    "overpayment": (
+        "Record recovery",
+        "Close (also records recovery)",
+        "This payment left twice. Either button records that the extra amount is being recovered; nothing is paid.",
+    ),
+    "payment_failed": ("Approve and retry payment", "Reject", ""),
+}
+
 s = settings()
 c = conn(s)
 st.title("Review inbox")
@@ -38,9 +55,12 @@ for it in items:
             note = st.text_input(
                 "Note (required)", key=f"note-{it.id}", placeholder="e.g. Confirmed the rename with FastShip by phone"
             )
+            yes, no, help_text = BUTTONS.get(it.reason, DEFAULT_BUTTONS)
+            if help_text:
+                st.caption(help_text)
             a, r = st.columns(2)
-            approve = a.form_submit_button("Approve and pay", type="primary")
-            reject = r.form_submit_button("Reject")
+            approve = a.form_submit_button(yes, type="primary")
+            reject = r.form_submit_button(no)
             if approve or reject:
                 try:
                     with contextlib.redirect_stdout(io.StringIO()):  # mock_payment prints to the server console

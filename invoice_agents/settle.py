@@ -62,7 +62,7 @@ def settle(
 
     Raises:
         ValueError: An approval with no total, or a decision that is neither approve nor reject.
-            Nothing is paid; a GUARDRAIL_OVERRIDE event may already be recorded.
+            Nothing is recorded or paid (an overridden approval is a rejection, which never raises).
     """
     final, overridden = approval.guard(decision, findings)
     if overridden:

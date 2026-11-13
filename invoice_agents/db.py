@@ -61,8 +61,9 @@ CREATE TABLE IF NOT EXISTS inbox (
 UNCONFIRMED_REASON = "payment_unconfirmed"  # inbox reason: a bank call whose outcome nobody saw
 
 
-# Far longer than one invoice's run or one bank call: a pending payment or an unfinished
-# invoice this old has no live process behind it.
+# Far longer than one bank call, so a pending payment this old has no live process behind it.
+# Not longer than every run: one CLI-backend agent call may take up to 180 s (cli_bridge.TIMEOUT_S),
+# and a run makes several.
 STALE_AFTER = timedelta(minutes=2)
 
 
@@ -135,7 +136,7 @@ def record(
         payload: Event details (JSON-serialisable).
         status: New status for the invoice row; ``None`` leaves it unchanged.
         **invoice_fields: Extra ``invoices`` columns to set (``content_hash``, ``total``,
-            ``currency``, ``source_path``).
+            ``currency``, ``source_path``, ``core``).
 
     Raises:
         sqlite3.Error: On any failure; nothing from this call is persisted.

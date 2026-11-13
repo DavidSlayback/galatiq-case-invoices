@@ -26,8 +26,9 @@ _CONFLICT = " (conflict "
 def fold(s: str | None) -> str:
     """Comparison form: NFKC, full Unicode case folding, single spaces.
 
-    NFKC makes full-width and compatibility forms one identity (D36), so a
-    look-alike spelling can never open a second ledger row and be paid twice.
+    NFKC makes full-width and compatibility forms one identity (D36), so such a
+    spelling cannot open a second ledger row. Other look-alikes (Cyrillic letters,
+    "lnc." for "Inc.") are not folded.
     It runs again after ``casefold``, whose output need not be NFKC-normal.
     """
     once = unicodedata.normalize("NFKC", s or "").casefold()

@@ -46,15 +46,15 @@ flowchart LR
     D -- duplicate --> SKIP[Skipped, never paid twice]
     D -- new or revision --> V[35 validation rules<br/>stock, prices, dates,<br/>vendor risk, fraud]
     V --> T{Route}
-    T -- hard failure --> REJ[Reject with reasons]
-    T -- clean, < $10K --> PAY[Pay once]
+    T -- hard failure: reject --> S[Settle<br/>guardrail: no approval with a hard finding<br/>pay what is still owed, or log the rejection]
+    T -- clean, < $10K: approve --> S
     T -- fraud, vendor change,<br/>> $50K --> H[Human inbox]
     T -- judgement call --> VP[VP agent proposes]
     VP --> C{Critic agent<br/>agrees?}
-    C -- yes --> G[Guardrail:<br/>no approval with a hard finding] --> PAY
+    C -- yes --> S
     C -- objects, round < 2 --> VP
     C -- deadlock --> H
-    H -- note + approve --> PAY
+    H -- note + decision --> S
 ```
 
 The full state graph is generated from the code: [docs/graph.mmd](docs/graph.mmd).
