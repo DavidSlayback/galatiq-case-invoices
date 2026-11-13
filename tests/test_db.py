@@ -59,3 +59,16 @@ def test_enqueue_inbox_writes_event_status_and_row(conn: sqlite3.Connection):
     assert row is not None and row["status"] == "escalated"
     assert conn.execute("SELECT status FROM inbox").fetchone()[0] == "open"
     assert db.events(conn, KEY.vendor, KEY.invoice_number)[-1]["event"] == "escalated"
+
+
+@pytest.mark.parametrize("table", ["invoice_events", "findings", "inbox"])
+def test_per_invoice_lookups_use_an_index(conn: sqlite3.Connection, table: str):
+    # A scan calls the Python FOLD collation on every row: listing the inbox took minutes on a 20k ledger.
+    sql = f"EXPLAIN QUERY PLAN SELECT * FROM {table} WHERE vendor=? AND invoice_number=?"
+    plan = " ".join(r[3] for r in conn.execute(sql, ("v", "n")))
+    assert "USING INDEX" in plan, plan
+
+
+def test_indexed_lookup_still_folds(conn: sqlite3.Connection):
+    db.record(conn, KEY, EventType.RECEIVED, actor="test", run_id="r1", status=Status.RECEIVED)
+    assert len(db.events(conn, "WIDGETS  INC.", "inv-1001")) == 1

@@ -56,6 +56,11 @@ CREATE TABLE IF NOT EXISTS inbox (
     vendor TEXT NOT NULL COLLATE FOLD, invoice_number TEXT NOT NULL COLLATE FOLD,
     revision INTEGER NOT NULL, reason TEXT NOT NULL, label TEXT, status TEXT NOT NULL DEFAULT 'open',
     created_ts TEXT NOT NULL, resolved_ts TEXT, note TEXT, amount_due TEXT);
+-- Per-invoice lookups. Number first, so one index serves both "number" and "vendor + number";
+-- without them every lookup scans the table through the Python FOLD callback.
+CREATE INDEX IF NOT EXISTS invoice_events_key ON invoice_events (invoice_number, vendor);
+CREATE INDEX IF NOT EXISTS findings_key ON findings (invoice_number, vendor);
+CREATE INDEX IF NOT EXISTS inbox_key ON inbox (invoice_number, vendor);
 """
 
 UNCONFIRMED_REASON = "payment_unconfirmed"  # inbox reason: a bank call whose outcome nobody saw
