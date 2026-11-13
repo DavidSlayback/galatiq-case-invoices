@@ -25,3 +25,13 @@ The interface choices below were made by the agent while implementing, as the sk
 - [x] Merged PRs #24–#29 into `main` at 4900426 (2026-11-13). A fresh clone passes the gate (322 tests) and the offline eval at 27/27.
 
 A database built before D40 is refused with a message to run `main.py reset`. `connect` adds `payments.status` to a D40-era database in place. External SQLite tools must register the `FOLD` collation (`identity.register`) before they can filter or write the key columns; an unfiltered `SELECT` works without it.
+
+## Review loop (2026-11-13)
+
+David asked for three review passes after the refactor: concision and reuse, readability and docs, and performance. They merged as PRs #31–#33 at 0c9eb4d. In each pass a fresh agent found and fixed issues, and a second fresh agent re-checked the result. A final holistic review and a scoped re-check followed.
+
+- **Concision:** net −58 lines; shared test banks and fixtures; no behaviour change, confirmed by re-review.
+- **Readability:** stale and overclaiming docs fixed; contract docstrings added; inbox buttons now named per item reason.
+- **Behaviour fixes found along the way (D46):** a re-run resumes an invoice a crash left mid-run (30-minute bound derived from the agent timeouts). A recorded human decision is never re-judged; a sweep returns an unsettled one to the inbox. Regressions R17–R21, each mutation-checked.
+- **Performance (D47):** three indexes; inbox listing on a 20k-invoice ledger went from 321 s to 0.25 s with byte-identical output.
+- **Gate on a fresh clone:** 332 tests; offline eval 27/27.
