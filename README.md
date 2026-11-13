@@ -61,8 +61,8 @@ The full state graph is generated from the code: [docs/graph.mmd](docs/graph.mmd
 
 - **Agents, typed:** PydanticAI agents with structured output, orchestrated by a pydantic-graph state machine.
   - The **extraction agent** copies each value as written; code parses it, so the arithmetic and date logic is exact and identical across models.
-  - The **VP agent** proposes approve or reject, citing rule IDs.
-  - An independent **critic agent** checks the proposal. Code verifies that every cited rule exists.
+  - The **VP agent** proposes approve or reject, citing rule IDs. It has tools: `vendor_history` (Acme's record with this vendor) and `catalog_item` (catalog price and stock). They are read-only lookups against the ledger, and every call is in the run's trace.
+  - An independent **critic agent** checks the proposal, using the same tools to check the VP's claims. Code verifies that every cited rule exists.
 - **Two self-correction loops:**
   - When the totals don't reconcile, the extractor is shown the specific numbers and asked again.
   - The VP answers the critic's objections for up to two rounds.

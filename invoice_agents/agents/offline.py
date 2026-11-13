@@ -10,7 +10,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-from pydantic_ai.messages import ModelMessage, ModelResponse, ToolCallPart
+from pydantic_ai.messages import ModelMessage, ModelResponse, ToolCallPart, ToolReturnPart
 from pydantic_ai.models.function import AgentInfo, FunctionModel
 
 GOLDEN_DIR = Path(__file__).resolve().parents[2] / "fixtures" / "golden"
@@ -60,10 +60,18 @@ def golden(kind: str, file_sha256: str, source: str, golden_dir: Path = GOLDEN_D
     return g
 
 
-def replay_model(output: dict[str, Any], name: str) -> FunctionModel:
-    """A model that answers with ``output`` as the agent's structured result."""
+def replay_model(output: dict[str, Any], name: str, tool_calls: list[dict[str, Any]] | None = None) -> FunctionModel:
+    """A model that answers with ``output`` as the agent's structured result.
 
-    def respond(_messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
+    ``tool_calls`` (``[{"tool": name, "args": {...}}]``) are made first, as a real model's
+    lookups would be, so offline runs exercise the agents' tools too (D48). The tools run
+    for real against the ledger; only the model's choices are replayed.
+    """
+
+    def respond(messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
+        called = any(isinstance(p, ToolReturnPart) for m in messages[-1:] for p in getattr(m, "parts", []))
+        if tool_calls and not called and info.function_tools:
+            return ModelResponse(parts=[ToolCallPart(tool_name=c["tool"], args=c.get("args", {})) for c in tool_calls])
         return ModelResponse(parts=[ToolCallPart(tool_name=info.output_tools[0].name, args=output)])
 
     return FunctionModel(respond, model_name=name)

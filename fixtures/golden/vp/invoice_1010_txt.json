@@ -11,5 +11,17 @@
         "PRICE_OVER_CATALOG"
       ]
     }
+  ],
+  "tool_calls": [
+    {
+      "tool": "vendor_history",
+      "args": {}
+    },
+    {
+      "tool": "catalog_item",
+      "args": {
+        "sku": "WidgetA"
+      }
+    }
   ]
 }

@@ -11,5 +11,11 @@
         "DUE_TERMS_MISMATCH"
       ]
     }
+  ],
+  "tool_calls": [
+    {
+      "tool": "vendor_history",
+      "args": {}
+    }
   ]
 }

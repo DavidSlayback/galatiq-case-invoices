@@ -6,5 +6,11 @@
       "agrees": true,
       "objections": []
     }
+  ],
+  "tool_calls": [
+    {
+      "tool": "vendor_history",
+      "args": {}
+    }
   ]
 }

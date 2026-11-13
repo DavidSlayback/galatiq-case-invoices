@@ -43,7 +43,7 @@ def resolve(settings: Settings, kind: str, doc: RawDocument, attempt: int = 0) -
     if is_offline(settings):
         g = golden(kind, doc.file_sha256, doc.path, settings.golden_dir)
         answers = g.get("attempts") or [g["output"]]
-        return replay_model(answers[min(attempt, len(answers) - 1)], name=f"offline:{kind}")
+        return replay_model(answers[min(attempt, len(answers) - 1)], f"offline:{kind}", g.get("tool_calls"))
     assert settings.model is not None
     if CLI_SPEC.fullmatch(settings.model):
         return backend(settings.model).as_model()

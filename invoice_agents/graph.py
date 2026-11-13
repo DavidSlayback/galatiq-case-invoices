@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 from pathlib import Path
 
-from pydantic_ai.exceptions import UnexpectedModelBehavior
+from pydantic_ai.exceptions import AgentRunError, UnexpectedModelBehavior
 from pydantic_ai.messages import ModelMessage
 from pydantic_graph import GraphBuilder, StepContext
 
@@ -238,13 +238,17 @@ async def vp_propose(ctx: StepContext[State, Deps, VpReview | Objected]) -> Prop
     if round_ == 0:
         s.review_brief = reviewers.case_brief(r.invoice, r.findings, r.usd_total)
     objections = list(r.objections) if isinstance(r, Objected) else []
+    assert s.key is not None
+    context = reviewers.ReviewContext(ctx.deps.conn, s.key)
     try:
-        p, s.vp_history, vp_tokens = await reviewers.propose(
-            s.doc, ctx.deps.settings, s.review_brief, objections, s.vp_history, round_
+        review = await reviewers.propose(
+            s.doc, ctx.deps.settings, context, s.review_brief, objections, s.vp_history, round_
         )
-    except UnexpectedModelBehavior as e:
+    except AgentRunError as e:  # a failing model, or one stuck calling tools, goes to a person
         return HumanReview(r.invoice, r.findings, r.usd_total, reason=f"vp agent failed: {e}")
-    ctx.deps.tracer.log("vp_propose", round=round_, proposal=p.model_dump(), tokens=vp_tokens)
+    p, s.vp_history = review.output, review.messages
+    ctx.deps.tracer.log("vp_propose", round=round_, proposal=p.model_dump(), tools=review.tool_calls,
+                        tokens=review.tokens)  # fmt: skip
     d = Decision(kind=p.decision, actor="vp_agent", reasons=p.reasons, cited_rule_ids=p.cited_rule_ids)
     return Proposed(r.invoice, r.findings, r.usd_total, decision=d, round=round_)
 
@@ -258,13 +262,16 @@ async def critique(ctx: StepContext[State, Deps, Proposed]) -> Approve | Reject 
     invented = [i for i in r.decision.cited_rule_ids if i not in known]
     if invented:  # checked in code: a citation must name a finding that exists
         verdict = reviewers.Critique(agrees=False, objections=[f"cited rule IDs not in the findings: {invented}"])
+        critic_tools: list[dict[str, object]] = []
         critic_tokens = (0, 0)
     else:
+        context = reviewers.ReviewContext(d.conn, s.key)
         try:
-            verdict, critic_tokens = await reviewers.critique(s.doc, d.settings, s.review_brief, r.decision, r.round)
-        except UnexpectedModelBehavior as e:
+            review = await reviewers.critique(s.doc, d.settings, context, s.review_brief, r.decision, r.round)
+        except AgentRunError as e:
             return HumanReview(r.invoice, r.findings, r.usd_total, reason=f"critic agent failed: {e}")
-    d.tracer.log("critique", round=r.round, verdict=verdict.model_dump(), tokens=critic_tokens)
+        verdict, critic_tools, critic_tokens = review.output, review.tool_calls, review.tokens
+    d.tracer.log("critique", round=r.round, verdict=verdict.model_dump(), tools=critic_tools, tokens=critic_tokens)
     if verdict.agrees:  # settling applies the guardrail, so an agreed approval with a hard finding still rejects
         if r.decision.kind == "approve":
             return Approve(r.invoice, r.findings, r.usd_total, decision=r.decision)
