@@ -14,6 +14,7 @@ KEY = InvoiceKey("Widgets Inc.", "INV-9", 0)
 
 
 def crash_after_bank(conn: sqlite3.Connection) -> list[Decimal]:
+    """Pay with a bank that takes the call and then kills the process (Crash is a BaseException)."""
     db.record(conn, KEY, EventType.RECEIVED, actor="t", run_id="r", status=Status.RECEIVED, total="100")
     bank, calls = recording_bank(Crash())
     with pytest.raises(Crash):
@@ -50,6 +51,7 @@ def test_reviewer_cancels_then_approves_the_retry_which_pays_once(conn: sqlite3.
 
 
 def test_failed_payment_and_its_inbox_item_commit_together(conn: sqlite3.Connection):
+    """A failing inbox insert rolls back PAYMENT_FAILED too, but not the pending row written earlier."""
     conn.execute("CREATE TRIGGER no_inbox BEFORE INSERT ON inbox BEGIN SELECT RAISE(ABORT, 'disk full'); END")
     with pytest.raises(sqlite3.IntegrityError):
         payment.pay(conn, KEY, Decimal(100), "USD", None, "r1", recording_bank({"status": "declined"})[0])

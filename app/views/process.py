@@ -49,7 +49,7 @@ if st.button("Process", type="primary"):
         path = ROOT / "data" / "invoices" / sample
     with st.status(f"Processing {path.name}…", expanded=True) as status:
         try:
-            with contextlib.redirect_stdout(io.StringIO()):
+            with contextlib.redirect_stdout(io.StringIO()):  # mock_payment prints to the server console
                 st.session_state.outcome = graph.process_sync(path, s, conn(s))
             status.update(label=f"Done: {path.name}", state="complete")
         except MissingFixture as e:

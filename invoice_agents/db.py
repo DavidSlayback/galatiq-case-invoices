@@ -1,9 +1,10 @@
-"""SQLite store: inventory, vendors, ledger, append-only event log and inbox.
+"""SQLite store: reference data, the invoice ledger, append-only events, payments and the inbox.
 
-The store exposes business transitions, not tables: each function below is
-one transaction that appends its event, updates the invoice's status row and
-writes any payment, inbox or findings rows together (D25). Callers never issue
-SQL against those tables. Triggers make the event table append-only.
+The store exposes business transitions, not tables (D41): each writing function
+below is one transaction that appends its event, updates the invoice's status
+row and writes any payment, inbox or findings rows together (D25). Other modules
+read these tables directly but never write them (seeding the reference tables
+aside). Triggers make the event table append-only.
 """
 
 import json
@@ -57,6 +58,19 @@ CREATE TABLE IF NOT EXISTS inbox (
     created_ts TEXT NOT NULL, resolved_ts TEXT, note TEXT, amount_due TEXT);
 """
 
+UNCONFIRMED_REASON = "payment_unconfirmed"  # inbox reason: a bank call whose outcome nobody saw
+
+
+# Far longer than one bank call, so a pending payment this old has no live process behind it.
+# Not longer than every run: one CLI-backend agent call may take up to 180 s (cli_bridge.TIMEOUT_S),
+# and a run makes several.
+STALE_AFTER = timedelta(minutes=2)
+
+
+def is_stale(ts: str, older_than: timedelta = STALE_AFTER) -> bool:
+    """Whether an ISO timestamp written by :func:`now` is older than ``older_than``."""
+    return ts <= (datetime.now(UTC) - older_than).isoformat(timespec="milliseconds")
+
 
 def now() -> str:
     """UTC timestamp in ISO 8601."""
@@ -69,7 +83,11 @@ def json_dumps(obj: Any) -> str:
 
 
 def connect(path: Path | str) -> sqlite3.Connection:
-    """Open the database in WAL mode (the CLI and Streamlit may share it) and ensure the schema."""
+    """Open the database in WAL mode (the CLI and Streamlit may share it), ensure the schema and migrate.
+
+    Raises:
+        RuntimeError: The file was built before the FOLD identity rule (D40).
+    """
     conn = sqlite3.connect(path, timeout=10)
     conn.row_factory = sqlite3.Row
     identity.register(conn)
@@ -118,7 +136,7 @@ def record(
         payload: Event details (JSON-serialisable).
         status: New status for the invoice row; ``None`` leaves it unchanged.
         **invoice_fields: Extra ``invoices`` columns to set (``content_hash``, ``total``,
-            ``currency``, ``source_path``).
+            ``currency``, ``source_path``, ``core``).
 
     Raises:
         sqlite3.Error: On any failure; nothing from this call is persisted.
@@ -144,7 +162,11 @@ def _record(
         " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
         (ts, run_id, key.vendor, key.invoice_number, key.revision, event, actor, json_dumps(payload or {})),
     )
-    if status is not None:
+    if status is None:  # still a sign of life: run recovery (D46) judges staleness by this column
+        conn.execute(
+            "UPDATE invoices SET updated_at=? WHERE vendor=? AND invoice_number=?", (ts, key.vendor, key.invoice_number)
+        )
+    else:
         fields = {k: (str(v) if isinstance(v, Decimal) else v) for k, v in invoice_fields.items()}
         cols = ["vendor", "invoice_number", "revision", "status", "updated_at", *fields]
         vals = [key.vendor, key.invoice_number, key.revision, status, ts, *fields.values()]
@@ -167,7 +189,7 @@ def enqueue_inbox(
     amount_due: Decimal | None = None,
     payload: dict[str, Any] | None = None,
 ) -> None:
-    """Put an invoice in the human-review inbox: event, status and inbox row in one transaction."""
+    """Put an invoice in the human-review inbox: ESCALATED event, status and inbox row in one transaction."""
     with conn:
         _enqueue(conn, key, reason, run_id, actor, label, amount_due, payload)
 
@@ -192,10 +214,8 @@ def _enqueue(
     _record(conn, key, EventType.ESCALATED, actor, run_id, payload, Status.ESCALATED, {})
 
 
-UNCONFIRMED_REASON = "payment_unconfirmed"
-
-
 def _close_items(conn: sqlite3.Connection, key: InvoiceKey, reason: str, note: str) -> None:
+    """Withdraw this revision's open items of one reason: the question they asked is now answered."""
     conn.execute(
         "UPDATE inbox SET status='withdrawn', resolved_ts=?, note=?"
         " WHERE vendor=? AND invoice_number=? AND revision=? AND reason=? AND status='open'",
@@ -246,13 +266,16 @@ def start_payment(
 ) -> int | None:
     """Claim the payment row before the bank is called, so a crash after the call leaves evidence.
 
-    A cancelled row for the same revision is reused, with its attempt number raised.
+    A cancelled row for the same revision is reused, with its attempt number raised;
+    the attempt number is how a late bank answer is told from the current one (D45).
 
     Returns:
         The attempt number to settle or fail by, or ``None`` when another process holds the
         row (pending or sent): the caller must not call the bank.
     """
     with conn:
+        # One statement claims the row: the upsert fires only over a cancelled row, so a pending
+        # or sent row makes it a no-op that RETURNs nothing (R13).
         cur = conn.execute(
             "INSERT INTO payments (vendor, invoice_number, revision, amount_paid, currency, usd_equivalent, ts, status,"
             " attempt) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', 1)"
@@ -274,7 +297,8 @@ def settle_payment(
     - The current attempt, pending or already cancelled by a reviewer: the row becomes sent and
       its open payment items close (a late success also withdraws the queued retry).
     - An older attempt whose row a retry has since reused: the money left twice. It is stored
-      as an overpayment, counted as paid, and queued for a person to recover.
+      as an overpayment, counted as paid, and queued for a person to recover (R14). Reporting
+      the same late attempt again changes nothing.
     """
     with conn:
         row = conn.execute(
@@ -320,8 +344,10 @@ def fail_payment(
 ) -> None:
     """Cancel attempt ``attempt``, record PAYMENT_FAILED and queue a retry for a person, in one transaction.
 
-    The row is kept as ``cancelled`` (not deleted) so a bank call that succeeds late still finds it.
-    A stale attempt (the row was reused or settled since) changes nothing.
+    The row is kept as ``cancelled`` (not deleted) so a bank call that succeeds late still finds it
+    (R11). A stale attempt (the row was reused or settled since) changes nothing. If an older
+    attempt already landed late and was stored as an overpayment, that attempt becomes the
+    payment instead: the row is sent, the invoice PAID, and no retry is queued (R16).
     """
     with conn:
         cur = conn.execute(
@@ -388,7 +414,10 @@ def resolve_inbox(
     decision: dict[str, Any],
     status: Status | None = None,
 ) -> None:
-    """Record a person's decision and close the inbox item (and optionally set the status), in one transaction."""
+    """Record a person's decision and close the inbox item (and optionally set the status), in one transaction.
+
+    Does not check that the item is still open; :func:`invoice_agents.inbox.resolve` does.
+    """
     with conn:
         _record(conn, key, EventType.HUMAN_DECISION, reviewer, run_id, decision, status, {})
         conn.execute(

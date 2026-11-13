@@ -21,7 +21,10 @@ class MissingFixture(LookupError):
 
 
 def _index(directory: Path) -> dict[str, dict[str, Any]]:
-    # Keyed on each file's name, size and mtime, so a directory rewritten in place is re-read.
+    """Goldens in ``directory`` by input-file hash.
+
+    The cache is keyed on each file's path, mtime and size, so a directory rewritten in place is re-read (D44).
+    """
     files = sorted(directory.glob("*.json"))
     return _load(tuple((p, p.stat().st_mtime_ns, p.stat().st_size) for p in files))
 
@@ -43,6 +46,10 @@ def golden(kind: str, file_sha256: str, source: str, golden_dir: Path = GOLDEN_D
         file_sha256: Hash of the input file.
         source: Path, for the error message.
         golden_dir: Replay source; ``Settings.golden_dir`` picks it per run.
+
+    Returns:
+        The golden record: its ``output``, or successive scripted answers in ``attempts``
+        (:func:`invoice_agents.agents.models.resolve` picks one per attempt).
 
     Raises:
         MissingFixture: No golden for this file.

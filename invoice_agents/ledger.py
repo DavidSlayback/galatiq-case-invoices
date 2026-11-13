@@ -9,6 +9,7 @@ and even in which optional fields they state (1011's PDF has no subtotal).
 import json
 import sqlite3
 from dataclasses import dataclass, field
+from datetime import timedelta
 from decimal import Decimal
 from typing import Any
 
@@ -82,7 +83,7 @@ class Conflict:
 
 @dataclass(frozen=True)
 class Revision:
-    """A higher revision of a known invoice."""
+    """A higher revision of a known invoice; ``open_inbox_ids`` are the items it withdraws (never payment items)."""
 
     previous_revision: int
     changes: dict[str, Any]
@@ -100,15 +101,48 @@ class Stale:
 Check = New | Duplicate | Conflict | Revision | Stale
 
 
+# Statuses a run passes through on its way to an outcome. An invoice left in one of them
+# (or escalated with its inbox item already answered) was cut off mid-run.
+_IN_FLIGHT = ("received", "extracted", "validated", "escalated")
+
+
+# A run that has not touched its invoice for this long is dead. Worst case for a live run:
+# 3 extraction attempts plus 2 VP-and-critic rounds (4 calls), each capped at the CLI
+# bridge's 180 s timeout, is 7 x 180 s = 21 min; every event also refreshes the row.
+RUN_STALE_AFTER = timedelta(minutes=30)
+
+
+def _interrupted(conn: sqlite3.Connection, key: InvoiceKey, row: sqlite3.Row) -> bool:
+    """A run died after recording this invoice but before it reached an outcome (D46).
+
+    True when the status row has not moved for ``RUN_STALE_AFTER``, no inbox item is open,
+    and no payment was started for this revision (a pending payment is the payment sweep's
+    job). Re-running the file then processes it again instead of skipping it as a duplicate.
+    The threshold is derived from the agent timeouts, so a live run never qualifies.
+    """
+    if row["status"] not in _IN_FLIGHT or not db.is_stale(row["updated_at"], RUN_STALE_AFTER):
+        return False
+    open_item = conn.execute(
+        "SELECT 1 FROM inbox WHERE vendor=? AND invoice_number=? AND status='open'", (key.vendor, key.invoice_number)
+    ).fetchone()
+    return open_item is None and db.payment_state(conn, key) is None
+
+
 def check(conn: sqlite3.Connection, key: InvoiceKey, inv: Invoice) -> Check:
-    """Compare an extracted invoice with what the ledger already holds for its vendor and number."""
+    """Compare an extracted invoice with what the ledger already holds for its vendor and number.
+
+    Read-only. Only the revision on file is compared: the same revision is a
+    duplicate or a conflict, a lower one is stale, a higher one is a revision.
+    """
     row = db.invoice_row(conn, key.vendor, key.invoice_number)
     if row is None or row["core"] is None:
         return New()
     old, new = json.loads(row["core"]), core(inv)
     if inv.revision == row["revision"]:
         bad = conflicts(old, new)
-        return Conflict(bad) if bad else Duplicate(row["status"], row["source_path"])
+        if bad:
+            return Conflict(bad)
+        return New() if _interrupted(conn, key, row) else Duplicate(row["status"], row["source_path"])
     if inv.revision < row["revision"]:
         return Stale(row["revision"])
     inbox = conn.execute(
@@ -196,7 +230,7 @@ def intake(
     Duplicates and stale revisions get RECEIVED and DUPLICATE_SKIPPED events and leave the
     status row of the copy on file alone. Everything else is recorded RECEIVED then EXTRACTED;
     a conflicting copy gets its own key, and a revision supersedes the original and withdraws
-    its open inbox items.
+    its open inbox items. Each event is its own transaction.
 
     Args:
         conn: Open connection.
@@ -208,6 +242,7 @@ def intake(
     """
     found = check(conn, key, inv)
     verdict = type(found).__name__
+    findings: list[Finding] = []
     if isinstance(found, Duplicate | Stale):
         db.record(conn, key, EventType.RECEIVED, actor="intake", run_id=run_id, payload=dict(source))
         why: dict[str, object] = (
@@ -216,12 +251,10 @@ def intake(
             else {"stale_revision": inv.revision, "current_revision": found.current_revision}
         )
         db.record(conn, key, EventType.DUPLICATE_SKIPPED, actor="ledger", run_id=run_id, payload=why)
-        findings = []
         if isinstance(found, Stale):
             msg = f"revision {inv.revision} is older than revision {found.current_revision} on file"
             findings.append(Finding(rule_id="STALE_REVISION", severity="soft", message=msg))
         return Intake(key, verdict, skipped=why, findings=findings)
-    findings: list[Finding] = []
     if isinstance(found, Conflict):
         key = identity.conflict_key(key, source["sha256"])
         msg = f"same invoice number and revision as one on file, but {', '.join(found.fields)} differ"
@@ -240,8 +273,11 @@ def intake(
             payload={"previous_revision": found.previous_revision, "revision": inv.revision,
                      "already_paid": str(found.already_paid), **found.changes},
         )  # fmt: skip
-        if found.already_paid > 0 and inv.total is not None:
-            amount_due = inv.total - found.already_paid
+    # Anything already paid on this invoice (an earlier revision, or this one before a crash
+    # cut its run short) sends the rest to a person rather than an agent (A8, D46).
+    paid = already_paid(conn, key.vendor, key.invoice_number)
+    if paid > 0 and inv.total is not None:
+        amount_due = inv.total - paid
     db.record(conn, key, EventType.EXTRACTED, actor="extractor", run_id=run_id, payload=extracted,
               status=Status.EXTRACTED)  # fmt: skip
     return Intake(key, verdict, findings=findings, amount_due=amount_due)

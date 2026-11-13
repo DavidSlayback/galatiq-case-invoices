@@ -1,9 +1,10 @@
 """Payment stage: the brief's mock banking API behind an idempotent ledger write (FR-4, D2, D29, D41).
 
 A payment is an outbox: the pending row is written before the bank is called
-and settled after it answers. If the process dies in between, the pending row
-stays, and the next attempt sends the invoice to a person to check the bank
-(``payment_unconfirmed``) instead of paying again.
+and settled after it answers. A pending row is never re-sent, because the money
+may already have left: if the process dies or the bank call raises, the next
+:func:`pay` for that revision or :func:`sweep_unconfirmed` sends the invoice to a
+person to check the bank (``payment_unconfirmed``) instead (D45).
 """
 
 import sqlite3
@@ -17,7 +18,7 @@ from invoice_agents.models import EventType, InvoiceKey, Status
 
 ATTEMPTS = 2  # A7
 UNCONFIRMED = db.UNCONFIRMED_REASON
-STALE_AFTER = timedelta(minutes=2)  # far longer than a bank call; a pending row this old has no live process
+STALE_AFTER = db.STALE_AFTER
 
 Bank = Callable[[str, Decimal], dict[str, str]]
 
@@ -45,10 +46,12 @@ def pay(
     run_id: str,
     bank: Bank = mock_payment,
 ) -> PaymentResult:
-    """Pay what is still owed on an approved invoice, at most once per revision.
+    """Pay what is still owed on an approved invoice revision, never re-sending a call whose outcome is unknown.
 
     The amount is the invoice total minus anything already paid (or pending) on
-    earlier revisions, so a revision after payment pays only the difference (D2).
+    earlier revisions and conflict copies, so a revision after payment pays only
+    the difference (D2). Only a definite refusal from the bank is retried, up to
+    ``ATTEMPTS`` calls. Each ledger write is its own transaction (see :mod:`db`).
 
     Args:
         conn: Open connection.
@@ -60,13 +63,15 @@ def pay(
         bank: Payment API; injectable so tests can simulate failures.
 
     Returns:
-        PAID with the amount sent; PAID with zero if this revision was already paid;
-        PAYMENT_FAILED after the retry budget; ESCALATED if an earlier attempt's outcome is
-        unknown. The last two leave the invoice in the inbox.
+        PAID with the amount sent; PAID with zero if this revision was already paid or
+        nothing is owed (a credit is recorded instead); PAYMENT_FAILED after the retry
+        budget; ESCALATED if this or an earlier call's outcome is unknown, or another
+        process holds the payment. PAYMENT_FAILED and unknown outcomes leave an inbox item.
     """
     state = db.payment_state(conn, key)
     if state and state[0] == "sent":
-        db.record(conn, key, EventType.PAYMENT_SKIPPED_ALREADY_PAID, actor="payment", run_id=run_id)
+        db.record(conn, key, EventType.PAYMENT_SKIPPED_ALREADY_PAID, actor="payment", run_id=run_id,
+                  status=Status.PAID)  # fmt: skip
         return PaymentResult(Status.PAID, Decimal(0))
     if state and state[0] == "pending":  # an earlier attempt died after (or before) the bank call: never guess
         _unconfirmed(conn, key, state[1], run_id, "an earlier attempt did not finish")
@@ -74,7 +79,7 @@ def pay(
     amount = total - ledger.already_paid(conn, key.vendor, key.invoice_number)
     if amount <= 0:  # B6: a revision below what was paid is a credit to recover, never a bank payment
         db.record(conn, key, EventType.PAYMENT_SKIPPED_ALREADY_PAID, actor="payment", run_id=run_id,
-                  payload={"credit_due": str(-amount)})  # fmt: skip
+                  payload={"credit_due": str(-amount)}, status=Status.PAID)  # fmt: skip
         return PaymentResult(Status.PAID, Decimal(0))
     # Scale the USD figure to the amount actually sent (a revision delta pays only part of the total).
     usd = (amount * usd_equivalent / total).quantize(fx.CENT) if usd_equivalent and total else amount
@@ -101,7 +106,11 @@ def pay(
 
 
 def confirm_pending(conn: sqlite3.Connection, key: InvoiceKey, run_id: str, actor: str) -> PaymentResult:
-    """A person saw the unconfirmed payment at the bank: settle it without sending again."""
+    """A person saw the unconfirmed payment at the bank: settle it without sending again.
+
+    Raises:
+        ValueError: No payment for this revision is pending.
+    """
     amount, attempt = _pending(conn, key)
     db.settle_payment(conn, key, attempt, run_id=run_id, actor=actor,
                       payload={"amount": amount, "confirmed_at_bank": True})  # fmt: skip
@@ -109,7 +118,11 @@ def confirm_pending(conn: sqlite3.Connection, key: InvoiceKey, run_id: str, acto
 
 
 def cancel_pending(conn: sqlite3.Connection, key: InvoiceKey, run_id: str, actor: str) -> PaymentResult:
-    """A person found no such payment at the bank: clear it; approving the new inbox item retries it."""
+    """A person found no such payment at the bank: cancel it; approving the new ``payment_failed`` item retries it.
+
+    Raises:
+        ValueError: No payment for this revision is pending.
+    """
     amount, attempt = _pending(conn, key)
     db.fail_payment(conn, key, attempt, run_id=run_id, actor=actor, amount=amount,
                     payload={"amount": amount, "errors": ["not found at the bank"]})  # fmt: skip
@@ -124,6 +137,7 @@ def _pending(conn: sqlite3.Connection, key: InvoiceKey) -> tuple[Decimal, int]:
 
 
 def _unconfirmed(conn: sqlite3.Connection, key: InvoiceKey, amount: Decimal, run_id: str, why: str) -> None:
+    """Queue a bank check for a pending payment, once: repeated sweeps and retries add no second item."""
     if not db.has_open_inbox(conn, key, UNCONFIRMED):
         db.enqueue_inbox(conn, key, reason=UNCONFIRMED, run_id=run_id, actor="payment", amount_due=amount,
                          payload={"error": why, "note": "check the bank before confirming or cancelling"})  # fmt: skip
