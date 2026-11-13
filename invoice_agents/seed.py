@@ -4,7 +4,7 @@ import json
 import sqlite3
 from pathlib import Path
 
-from invoice_agents.db import SCHEMA, connect
+from invoice_agents.db import connect
 
 # The brief's stock levels; unit prices added so price checks have a catalog (D6).
 INVENTORY = [
@@ -58,6 +58,5 @@ def reset(path: Path) -> sqlite3.Connection:
     for suffix in ("", "-wal", "-shm"):
         Path(f"{path}{suffix}").unlink(missing_ok=True)
     conn = connect(path)
-    conn.executescript(SCHEMA)
     seed(conn)
     return conn

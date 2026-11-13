@@ -11,7 +11,6 @@ from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
 
-PRICES_AS_OF = "2026-11-12"
 # model name fragment -> (USD per 1M input tokens, USD per 1M output tokens)
 PRICES: dict[str, tuple[Decimal, Decimal]] = {
     "grok-4.7": (Decimal("2.00"), Decimal("6.00")),

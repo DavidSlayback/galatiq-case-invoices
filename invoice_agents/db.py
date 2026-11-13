@@ -406,9 +406,11 @@ def stale_pending(conn: sqlite3.Connection, older_than: timedelta) -> list[tuple
     return [(InvoiceKey(r[0], r[1], r[2]), Decimal(r[3])) for r in rows]
 
 
-def payment_attempt(conn: sqlite3.Connection, key: InvoiceKey) -> int | None:
-    """The current attempt number on one invoice revision's payment row."""
+def pending_payment(conn: sqlite3.Connection, key: InvoiceKey) -> tuple[Decimal, int] | None:
+    """``(amount, attempt)`` of one invoice revision's payment while it is pending, else ``None``."""
     row = conn.execute(
-        "SELECT attempt FROM payments WHERE vendor=? AND invoice_number=? AND revision=?", tuple(key)
+        "SELECT amount_paid, attempt FROM payments WHERE vendor=? AND invoice_number=? AND revision=?"
+        " AND status='pending'",
+        tuple(key),
     ).fetchone()
-    return None if row is None else int(row[0])
+    return None if row is None else (Decimal(row[0]), int(row[1]))

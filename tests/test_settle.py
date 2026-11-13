@@ -7,13 +7,10 @@ import pytest
 
 from invoice_agents import db, inbox, settle
 from invoice_agents.models import Decision, EventType, Finding, InvoiceKey, Status
+from tests.conftest import ok
 
 KEY = InvoiceKey("Widgets Inc.", "INV-8", 0)
 STOCK = Finding(rule_id="STOCK_EXCEEDED", severity="hard", message="too many", evidence={"sku": "GadgetX"})
-
-
-def ok(vendor: str, amount: Decimal) -> dict[str, str]:
-    return {"status": "success"}
 
 
 def events(conn: sqlite3.Connection) -> list[str]:

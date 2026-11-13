@@ -17,7 +17,6 @@ from invoice_agents.models import Finding, Outcome  # noqa: E402
 from invoice_agents.seed import open_db  # noqa: E402
 from invoice_agents.settings import Settings, from_env  # noqa: E402
 
-SEVERITY_COLOUR = {"hard": "red", "fraud": "violet", "soft": "orange", "note": "gray"}
 STATUS_COLOUR = {"paid": "green", "rejected": "red", "escalated": "orange", "duplicate_skipped": "blue"}
 SAMPLES = sorted(p for p in (ROOT / "data" / "invoices").rglob("*") if p.is_file())
 

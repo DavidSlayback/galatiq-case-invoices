@@ -8,24 +8,9 @@ import pytest
 
 from invoice_agents import db, inbox, payment
 from invoice_agents.models import EventType, InvoiceKey, Status
+from tests.conftest import Crash, recording_bank
 
 KEY = InvoiceKey("Widgets Inc.", "INV-9", 0)
-
-
-class Crash(BaseException):
-    """The process dying: not an Exception, so the bank retry loop does not swallow it."""
-
-
-def recording_bank(outcome: dict[str, str] | BaseException):
-    calls: list[Decimal] = []
-
-    def bank(vendor: str, amount: Decimal) -> dict[str, str]:
-        calls.append(amount)
-        if isinstance(outcome, BaseException):
-            raise outcome
-        return outcome
-
-    return bank, calls
 
 
 def crash_after_bank(conn: sqlite3.Connection) -> list[Decimal]:

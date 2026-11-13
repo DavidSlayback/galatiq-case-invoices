@@ -1,4 +1,3 @@
-import sqlite3
 from datetime import date
 from decimal import Decimal
 from typing import Any
@@ -8,11 +7,6 @@ import pytest
 from invoice_agents.models import Invoice, LineItem
 from invoice_agents.rules import Reference, check
 from invoice_agents.settings import DEFAULT_AS_OF
-
-
-@pytest.fixture
-def ref(conn: sqlite3.Connection) -> Reference:
-    return Reference.load(conn)
 
 
 def line(sku: str | None, qty: str, price: str, raw: str | None = None) -> LineItem:

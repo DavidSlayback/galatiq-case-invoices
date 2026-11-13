@@ -17,9 +17,6 @@ HIGH_RISK = 60
 LOOKALIKE_DISTANCE = 2
 
 
-norm = identity.fold  # the one comparison form for vendor names (D38)
-
-
 def distance(a: str, b: str) -> int:
     """Levenshtein edit distance."""
     prev = list(range(len(b) + 1))
@@ -40,14 +37,13 @@ class VendorMatch:
 
 
 def match(name: str | None, known: dict[str, str], aliases: dict[str, str]) -> VendorMatch:
-    """Classify a vendor name against registry names and aliases (both keyed by ``norm``)."""
-    n = norm(name)
+    """Classify a vendor name against registry names and aliases (both keyed by :func:`identity.fold`, D38)."""
+    n = identity.fold(name)
     if not n:
         return VendorMatch("missing")
-    plain = " ".join((name or "").casefold().split())
     if n in known or n in aliases:
         # Equal only after NFKC folding (full-width or other look-alike code points): impersonation (B4).
-        if plain != n:
+        if identity.plain(name) != n:
             return VendorMatch("lookalike", known.get(n) or aliases[n])
         return VendorMatch("exact", known[n]) if n in known else VendorMatch("alias", aliases[n])
     # 'Widgets lnc.' (lower-case L for I) is one edit from 'Widgets Inc.'.

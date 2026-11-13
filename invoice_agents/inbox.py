@@ -37,24 +37,21 @@ class Item:
     created: str
 
 
-def _latest_findings(conn: sqlite3.Connection, key: InvoiceKey) -> list[sqlite3.Row]:
+def findings_for(conn: sqlite3.Connection, key: InvoiceKey) -> list[Finding]:
+    """The invoice's findings from its most recent run, as the settlement module takes them."""
     run = conn.execute(
         "SELECT run_id FROM findings WHERE vendor=? AND invoice_number=? ORDER BY rowid DESC LIMIT 1",
         (key.vendor, key.invoice_number),
     ).fetchone()
     if run is None:
         return []
-    return conn.execute(
+    rows = conn.execute(
         "SELECT * FROM findings WHERE run_id=? AND vendor=? AND invoice_number=?",
         (run[0], key.vendor, key.invoice_number),
     ).fetchall()
-
-
-def findings_for(conn: sqlite3.Connection, key: InvoiceKey) -> list[Finding]:
-    """The invoice's findings from its most recent run, as the settlement module takes them."""
     return [
         Finding(rule_id=f["rule_id"], severity=f["severity"], message=f["message"], evidence=json.loads(f["evidence"]))
-        for f in _latest_findings(conn, key)
+        for f in rows
     ]
 
 
@@ -75,14 +72,14 @@ def list_open(conn: sqlite3.Connection) -> list[Item]:
     for r in conn.execute("SELECT * FROM inbox WHERE status='open' ORDER BY id").fetchall():
         key = InvoiceKey(r["vendor"], r["invoice_number"], r["revision"])
         inv = db.invoice_row(conn, key.vendor, key.invoice_number)
-        findings = _latest_findings(conn, key)
-        risk = next((json.loads(f["evidence"]).get("score") for f in findings if f["rule_id"] == "VENDOR_RISK"), None)
+        findings = findings_for(conn, key)
+        risk = next((f.evidence.get("score") for f in findings if f.rule_id == "VENDOR_RISK"), None)
         out.append(
             Item(
                 id=r["id"], key=key, reason=r["reason"], label=r["label"],
                 total=inv["total"] if inv else None, currency=inv["currency"] if inv else None,
                 amount_due=r["amount_due"], risk=risk,
-                flags=sorted({f["rule_id"] for f in findings if f["severity"] != "note"}),
+                flags=sorted({f.rule_id for f in findings if f.severity != "note"}),
                 reasoning=_reasoning(conn, key, r["reason"]), created=r["created_ts"],
             )
         )  # fmt: skip
@@ -147,8 +144,7 @@ def resolve(
         db.resolve_inbox(conn, r["id"], key, reviewer=reviewer, run_id=run_id, decision=decision, status=Status.PAID)
         return {"status": "recovery_recorded", "amount": r["amount_due"]}
     if r["reason"] == payment.UNCONFIRMED:  # approve = seen at the bank; reject = not there, retry from the inbox
-        state = db.payment_state(conn, key)
-        if state is None or state[0] != "pending":
+        if db.pending_payment(conn, key) is None:
             raise InboxError(f"{key.invoice_number} has no unconfirmed payment any more; refresh the inbox")
         db.resolve_inbox(conn, r["id"], key, reviewer=reviewer, run_id=run_id, decision=decision)
         res = (payment.confirm_pending if approve else payment.cancel_pending)(conn, key, run_id, reviewer)

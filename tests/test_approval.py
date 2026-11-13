@@ -100,14 +100,14 @@ def run(conn: sqlite3.Connection, offline: Settings) -> tuple[Any, list[dict[str
     return o, trace
 
 
-def test_vp_approves_and_critic_agrees(conn: sqlite3.Connection, offline: Settings, goldens: Replay):
+def test_vp_approves_and_critic_agrees(conn: sqlite3.Connection, goldens: Replay):
     goldens("vp", [approve()])
     goldens("critic", [{"agrees": True}])
     o, _ = run(conn, goldens.settings)
     assert o.status == Status.PAID and o.decision is not None and o.decision.actor == "vp_agent"
 
 
-def test_disagreement_for_two_rounds_goes_to_inbox(conn: sqlite3.Connection, offline: Settings, goldens: Replay):
+def test_disagreement_for_two_rounds_goes_to_inbox(conn: sqlite3.Connection, goldens: Replay):
     goldens("vp", [approve(), approve()])
     goldens("critic", [{"agrees": False, "objections": ["a"]}, {"agrees": False, "objections": ["b"]}])
     o, trace = run(conn, goldens.settings)
@@ -116,7 +116,7 @@ def test_disagreement_for_two_rounds_goes_to_inbox(conn: sqlite3.Connection, off
     assert conn.execute("SELECT reason FROM inbox").fetchone()[0] == "vp_critic_disagree"
 
 
-def test_invented_citation_is_objected_in_code(conn: sqlite3.Connection, offline: Settings, goldens: Replay):
+def test_invented_citation_is_objected_in_code(conn: sqlite3.Connection, goldens: Replay):
     goldens("vp", [approve("MADE_UP"), approve()])
     goldens("critic", [{"agrees": True}])
     o, trace = run(conn, goldens.settings)

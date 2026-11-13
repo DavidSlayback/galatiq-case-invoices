@@ -11,11 +11,6 @@ from invoice_agents.seed import reset
 KEY = InvoiceKey("Widgets Inc.", "INV-1001", 0)
 
 
-@pytest.fixture
-def conn(tmp_path: Path) -> sqlite3.Connection:
-    return reset(tmp_path / "t.db")
-
-
 def test_seed_matches_brief(conn: sqlite3.Connection):
     rows = {r["item"]: (r["stock"], r["unit_price"]) for r in conn.execute("SELECT * FROM inventory")}
     assert rows == {

@@ -43,12 +43,12 @@ class Reference:
     def load(cls, conn: sqlite3.Connection) -> Reference:
         """Read inventory, vendors and FX rates."""
         inv = conn.execute("SELECT item, stock, unit_price FROM inventory").fetchall()
-        vend = conn.execute("SELECT * FROM vendors").fetchall()
+        known = {identity.fold(r["name"]): dict(r) for r in conn.execute("SELECT * FROM vendors")}
         return cls(
             stock={r["item"]: r["stock"] for r in inv},
             price={r["item"]: Decimal(r["unit_price"]) for r in inv},
-            vendors={norm(r["name"]): dict(r) for r in vend},
-            aliases={k: v for k, v in identity.registry(conn).items() if k not in {norm(r["name"]) for r in vend}},
+            vendors=known,
+            aliases={k: v for k, v in identity.registry(conn).items() if k not in known},
             rates=fx.rates(conn),
         )
 
@@ -68,9 +68,6 @@ class Ctx:
 
 
 Rule = Callable[[Ctx], list[Finding]]
-
-
-norm = vendors.norm  # one normaliser for every vendor comparison (B4)
 
 
 def _f(rule_id: str, severity: Severity, message: str, **evidence: object) -> Finding:
@@ -234,7 +231,7 @@ def vendor_checks(c: Ctx) -> list[Finding]:
     inv, out = c.invoice, []
     m = vendors.match(inv.vendor, {k: v["name"] for k, v in c.ref.vendors.items()}, c.ref.aliases)  # type: ignore[misc]
     urgent = URGENCY.findall(urgency_text(inv))
-    bad_addr = any(s in norm(inv.vendor_address) for s in SUSPICIOUS_ADDRESSES)
+    bad_addr = any(s in identity.fold(inv.vendor_address) for s in SUSPICIOUS_ADDRESSES)
     if m.kind == "unknown":
         out.append(_f("UNKNOWN_VENDOR", "soft", f"'{inv.vendor}' is not in the vendor registry", vendor=inv.vendor))
     elif m.kind == "alias":
@@ -282,7 +279,7 @@ def prompt_injection(c: Ctx) -> list[Finding]:
 
 def bank_details(c: Ctx) -> list[Finding]:
     """Remittance details that do not match the registry's bank reference for a known vendor."""
-    v = c.ref.vendors.get(norm(c.invoice.vendor))
+    v = c.ref.vendors.get(identity.fold(c.invoice.vendor))
     remit = c.invoice.remit_to
     if not remit or v is None or not v.get("bank_ref") or str(v["bank_ref"]) in remit:
         return []
