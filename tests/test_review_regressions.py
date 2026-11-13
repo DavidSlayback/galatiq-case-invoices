@@ -8,7 +8,7 @@ from typing import Any
 
 import pytest
 
-from invoice_agents import db, graph, inbox, ledger, payment
+from invoice_agents import db, graph, identity, inbox, ledger, payment
 from invoice_agents.agents import cli_bridge
 from invoice_agents.models import EventType, Invoice, InvoiceKey, LineItem, Status
 from invoice_agents.rules import Reference, check
@@ -27,11 +27,11 @@ def inv(**kw: Any) -> Invoice:
 
 @pytest.mark.parametrize("variant", ["WIDGETS INC.", "Widgets  Inc.", "widgets inc."])
 def test_b1_vendor_spelling_variants_share_one_ledger_key(conn: sqlite3.Connection, variant: str):
-    first = ledger.key_for(inv(), "a" * 64)
+    first = identity.key_for(conn, inv(), "a" * 64)
     db.record(conn, first, EventType.RECEIVED, actor="t", run_id="r", status=Status.RECEIVED,
               core=__import__("json").dumps(ledger.core(inv())))  # fmt: skip
     payment.pay(conn, first, Decimal(250), "USD", None, "r", lambda v, a: {"status": "success"})
-    again = ledger.key_for(inv(vendor=variant), "b" * 64)
+    again = identity.key_for(conn, inv(vendor=variant), "b" * 64)
     assert isinstance(ledger.check(conn, again, inv(vendor=variant)), ledger.Duplicate | ledger.Conflict)
     assert ledger.already_paid(conn, again.vendor, again.invoice_number) == Decimal(250)
 
@@ -101,7 +101,7 @@ def test_b6_lower_revision_after_payment_never_calls_the_bank(conn: sqlite3.Conn
 def test_b7_conflict_copy_counts_what_the_original_was_paid(conn: sqlite3.Connection):
     k = InvoiceKey("Widgets Inc.", "INV-1", 0)
     payment.pay(conn, k, Decimal(1000), "USD", None, "r", lambda v, a: {"status": "success"})
-    assert ledger.already_paid(conn, k.vendor, f"INV-1{ledger.CONFLICT_SUFFIX}abcd1234)") == Decimal(1000)
+    assert ledger.already_paid(conn, k.vendor, identity.conflict_key(k, "abcd1234" * 8).invoice_number) == Decimal(1000)
 
 
 def test_b8_prompt_goes_on_stdin_not_argv():

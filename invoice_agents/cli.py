@@ -12,7 +12,7 @@ import typer
 from rich.console import Console
 
 from invoice_agents import eval as eval_mod
-from invoice_agents import graph, inbox
+from invoice_agents import graph, identity, inbox
 from invoice_agents import settings as settings_mod
 from invoice_agents.agents.cli_bridge import BackendQuotaError
 from invoice_agents.agents.models import detect
@@ -134,7 +134,9 @@ def history(invoice_number: str, db: DbOpt = None) -> None:
     """Show the event timeline for one invoice (every vendor and revision with that number)."""
     s = build_settings(None, False, None, db)
     conn = open_db(s.db_path)
-    rows = conn.execute("SELECT * FROM invoice_events WHERE invoice_number=? ORDER BY id", (invoice_number,)).fetchall()
+    rows = conn.execute(
+        "SELECT * FROM invoice_events WHERE invoice_number=? ORDER BY id", (identity.lookup_number(invoice_number),)
+    ).fetchall()
     if not rows:
         console.print(f"[yellow]No events for {invoice_number}.[/yellow]")
         raise typer.Exit(1)

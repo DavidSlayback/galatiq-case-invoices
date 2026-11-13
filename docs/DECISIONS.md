@@ -81,6 +81,7 @@ Decisions from the grilling session on 2026-11-12. Each one comes from David unl
 | D37 | A unit price is derived from the line amount when only an amount is stated; a line with no price at all raises PRICE_UNVERIFIABLE (soft). A total ≤ 0 or a negative unit price is hard. A payment ≤ 0 is recorded as a credit due, never sent to the bank. | Review B2 and B6. |
 | D38 | A vendor name that matches the registry only after Unicode folding is a look-alike. One normaliser is used for every vendor comparison. | A full-width "Widgets" passed as exact and skipped the bank check (B4). |
 | D39 | The injection rule scans the raw document text and every extracted string. Inbox actions resolve by inbox id or vendor and refuse ambiguity. A conflicting copy counts what the original was paid. CLI prompts go on stdin. | Review B3, B5, B7, B8. |
+| D40 | Invoice identity lives in one module (`identity.py`). One fold (NFKC, Unicode casefold, single spaces) is used in Python and, as the SQLite collation `FOLD`, on every key column. An exact or alias vendor name is keyed under its registered name; a look-alike is not. Conflict copies are matched by number, not `LIKE`. Typed invoice numbers are normalised. | `NOCASE` folds only ASCII, so "Müller GmbH" and "MÜLLER GMBH" could both be paid, and an alias resubmission escaped the duplicate check. Agent choice from the architecture review (docs/REFACTOR.md). |
 
 ## Agent choices (not decided by David; flag if wrong)
 

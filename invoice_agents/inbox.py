@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any
 
-from invoice_agents import db, fx, payment
+from invoice_agents import db, fx, identity, payment
 from invoice_agents.models import EventType, InvoiceKey, Status
 from invoice_agents.trace import new_run_id
 
@@ -84,7 +84,7 @@ def _find(conn: sqlite3.Connection, invoice_number: str, vendor: str | None, inb
     if inbox_id is not None:
         rows = conn.execute("SELECT * FROM inbox WHERE id=?", (inbox_id,)).fetchall()
     else:
-        sql, args = "SELECT * FROM inbox WHERE invoice_number=?", [invoice_number]
+        sql, args = "SELECT * FROM inbox WHERE invoice_number=?", [identity.lookup_number(invoice_number)]
         if vendor:
             sql, args = sql + " AND vendor=?", [*args, vendor]
         rows = conn.execute(sql + " ORDER BY id DESC", args).fetchall()
@@ -93,7 +93,7 @@ def _find(conn: sqlite3.Connection, invoice_number: str, vendor: str | None, inb
     open_rows = [r for r in rows if r["status"] == "open"]
     if not open_rows:
         raise InboxError(f"{invoice_number} is not open (status: {rows[0]['status']}; {rows[0]['note'] or ''})")
-    if len({r["vendor"].lower() for r in open_rows}) > 1:  # B3: never guess which vendor's invoice to pay
+    if len({identity.fold(r["vendor"]) for r in open_rows}) > 1:  # B3: never guess which vendor's invoice to pay
         names = ", ".join(sorted({r["vendor"] for r in open_rows}))
         raise InboxError(f"{invoice_number} is open for several vendors ({names}); name the vendor")
     return open_rows[0]
