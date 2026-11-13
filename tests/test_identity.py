@@ -55,7 +55,7 @@ def _pay_first(conn: sqlite3.Connection, vendor: str) -> InvoiceKey:
 def test_non_ascii_case_variant_is_not_paid_twice(conn: sqlite3.Connection):
     _pay_first(conn, "Müller GmbH")
     again = identity.key_for(conn, inv("MÜLLER GMBH"), "b" * 64)
-    assert isinstance(ledger.check(conn, again, inv("MÜLLER GMBH")), ledger.Duplicate | ledger.Conflict)
+    assert isinstance(ledger.check(conn, again, inv("MÜLLER GMBH")), ledger.Duplicate)
     assert ledger.already_paid(conn, again.vendor, again.invoice_number) == Decimal(250)
 
 
@@ -68,7 +68,21 @@ def test_resubmission_under_an_alias_meets_the_original(conn: sqlite3.Connection
     _pay_first(conn, "FastShip Ltd.")
     again = identity.key_for(conn, inv("QuickShip Distributors"), "b" * 64)
     assert ledger.already_paid(conn, again.vendor, again.invoice_number) == Decimal(250)
-    assert not isinstance(ledger.check(conn, again, inv("QuickShip Distributors")), ledger.New)
+    found = ledger.check(conn, again, inv("QuickShip Distributors"))
+    assert isinstance(found, ledger.Conflict) and found.fields == ["vendor"]  # escalated as fraud, never paid
+
+
+def test_full_width_copy_is_a_conflict_not_a_silent_duplicate(conn: sqlite3.Connection):
+    _pay_first(conn, "Widgets Inc.")
+    fw = "\uff37\uff49\uff44\uff47\uff45\uff54\uff53 Inc."
+    again = identity.key_for(conn, inv(fw), "b" * 64)
+    assert isinstance(ledger.check(conn, again, inv(fw)), ledger.Conflict)
+
+
+def test_an_alias_claimed_by_two_vendors_is_refused(conn: sqlite3.Connection):
+    conn.execute("INSERT INTO vendors VALUES ('Other Ltd.', NULL, 1, '[\"QuickShip Distributors\"]', 'X')")
+    with pytest.raises(ValueError, match="names both"):
+        identity.registry(conn)
 
 
 def test_lookalike_is_never_resolved_to_the_real_vendor(conn: sqlite3.Connection):

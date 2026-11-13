@@ -4,9 +4,12 @@ Every ledger key is built here, and every key column in the database compares
 through :func:`fold` (registered as the SQLite collation ``FOLD``). So
 "WIDGETS  INC.", "widgets inc." and "Müller"/"MÜLLER" each name one vendor,
 in Python and in SQL alike. A vendor named exactly or by a registry alias is
-keyed under its registered name, so a resubmission under an alias still meets
-the original in the ledger; a look-alike is never resolved (it must not
-inherit a real vendor's history). A conflicting copy is recognised only here.
+keyed under its registered name, so a resubmission under an alias meets the
+original in the ledger (its differing name makes it a conflict, escalated as
+fraud, never a silent new invoice). Forms equal only after NFKC (full-width
+letters) share an identity by D36, so they can never be paid twice; the rules
+still flag them as look-alikes. Edit-distance look-alikes ("Widgets lnc.") are
+never resolved. A conflicting copy is recognised only here.
 """
 
 import json
@@ -31,18 +34,27 @@ def _collate(a: str, b: str) -> int:
     return (fa > fb) - (fa < fb)
 
 
+def plain(s: str | None) -> str:
+    """Case- and space-insensitive form *without* NFKC: tells a full-width look-alike from the real name."""
+    return " ".join((s or "").casefold().split())
+
+
 def register(conn: sqlite3.Connection) -> None:
     """Teach a connection the ``FOLD`` collation (must run before the schema is used)."""
     conn.create_collation(COLLATION, _collate)
 
 
 def registry(conn: sqlite3.Connection) -> dict[str, str]:
-    """Folded registered name or alias → registered name."""
+    """Folded registered name or alias → registered name.
+
+    Raises:
+        ValueError: One name or alias belongs to two vendors; paying either would be a guess.
+    """
     out: dict[str, str] = {}
-    for r in conn.execute("SELECT name, aliases_json FROM vendors").fetchall():
-        out[fold(r["name"])] = r["name"]
-        for a in json.loads(r["aliases_json"]):
-            out.setdefault(fold(a), r["name"])
+    for r in conn.execute("SELECT name, aliases_json FROM vendors ORDER BY name").fetchall():
+        for n in (r["name"], *json.loads(r["aliases_json"])):
+            if out.setdefault(fold(n), r["name"]) != r["name"]:
+                raise ValueError(f"vendor registry: {n!r} names both {out[fold(n)]!r} and {r['name']!r}")
     return out
 
 

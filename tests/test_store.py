@@ -57,7 +57,7 @@ def test_reviewer_cancels_then_approves_the_retry_which_pays_once(conn: sqlite3.
     crash_after_bank(conn)
     payment.pay(conn, KEY, Decimal(100), "USD", None, "r2", recording_bank({"status": "success"})[0])
     out = inbox.resolve(conn, KEY.invoice_number, approve=False, note="not on statement", reviewer="human:t")
-    assert out["status"] == "payment_failed" and db.payment_state(conn, KEY) is None
+    assert out["status"] == "payment_failed" and db.payment_state(conn, KEY) == ("cancelled", Decimal(100))
     (item,) = inbox.list_open(conn)
     assert item.reason == "payment_failed"
     inbox.resolve(conn, KEY.invoice_number, approve=True, note="retry", reviewer="human:t")
@@ -67,7 +67,7 @@ def test_reviewer_cancels_then_approves_the_retry_which_pays_once(conn: sqlite3.
 def test_failed_payment_and_its_inbox_item_commit_together(conn: sqlite3.Connection):
     conn.execute("CREATE TRIGGER no_inbox BEFORE INSERT ON inbox BEGIN SELECT RAISE(ABORT, 'disk full'); END")
     with pytest.raises(sqlite3.IntegrityError):
-        payment.pay(conn, KEY, Decimal(100), "USD", None, "r1", recording_bank(ConnectionError("down"))[0])
+        payment.pay(conn, KEY, Decimal(100), "USD", None, "r1", recording_bank({"status": "declined"})[0])
     assert [e["event"] for e in db.events(conn, *KEY[:2])] == []  # no PAYMENT_FAILED without its inbox item
     assert db.payment_state(conn, KEY) == ("pending", Decimal(100))  # the evidence survives the rollback
 

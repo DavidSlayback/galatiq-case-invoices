@@ -69,7 +69,8 @@ def _reasoning(conn: sqlite3.Connection, key: InvoiceKey, reason: str) -> list[s
 
 
 def list_open(conn: sqlite3.Connection) -> list[Item]:
-    """Open inbox items, oldest first."""
+    """Open inbox items, oldest first (after surfacing any payment a dead process left pending)."""
+    payment.sweep_unconfirmed(conn, new_run_id())
     out: list[Item] = []
     for r in conn.execute("SELECT * FROM inbox WHERE status='open' ORDER BY id").fetchall():
         key = InvoiceKey(r["vendor"], r["invoice_number"], r["revision"])
@@ -93,8 +94,8 @@ def _find(conn: sqlite3.Connection, invoice_number: str, vendor: str | None, inb
         rows = conn.execute("SELECT * FROM inbox WHERE id=?", (inbox_id,)).fetchall()
     else:
         sql, args = "SELECT * FROM inbox WHERE invoice_number=?", [identity.lookup_number(invoice_number)]
-        if vendor:
-            sql, args = sql + " AND vendor=?", [*args, vendor]
+        if vendor:  # an alias finds the invoice keyed under the registered name
+            sql, args = sql + " AND vendor=?", [*args, identity.registry(conn).get(identity.fold(vendor), vendor)]
         rows = conn.execute(sql + " ORDER BY id DESC", args).fetchall()
     if not rows:
         raise InboxError(f"{invoice_number} is not in the inbox")
@@ -116,6 +117,7 @@ def resolve(
     reviewer: str,
     vendor: str | None = None,
     inbox_id: int | None = None,
+    bank: payment.Bank = payment.mock_payment,
 ) -> dict[str, Any]:
     """Approve (and pay) or reject one escalated invoice.
 
@@ -127,6 +129,7 @@ def resolve(
         reviewer: Who decided, e.g. ``human:cli``.
         vendor: Disambiguates when two vendors use the same invoice number.
         inbox_id: The exact inbox item (the dashboard passes this).
+        bank: Payment adapter.
 
     Returns:
         What happened: status, and the amount paid if any.
@@ -138,6 +141,18 @@ def resolve(
         raise InboxError("a note is required for every human decision")
     r = _find(conn, invoice_number, vendor, inbox_id)
     key = InvoiceKey(r["vendor"], r["invoice_number"], r["revision"])
+    run_id = new_run_id()
+    decision = {"kind": "approve" if approve else "reject", "note": note, "inbox_id": r["id"], "reason": r["reason"]}
+    if r["reason"] == "overpayment":  # money already left twice: the decision records the recovery, nothing is paid
+        db.resolve_inbox(conn, r["id"], key, reviewer=reviewer, run_id=run_id, decision=decision, status=Status.PAID)
+        return {"status": "recovery_recorded", "amount": r["amount_due"]}
+    if r["reason"] == payment.UNCONFIRMED:  # approve = seen at the bank; reject = not there, retry from the inbox
+        state = db.payment_state(conn, key)
+        if state is None or state[0] != "pending":
+            raise InboxError(f"{key.invoice_number} has no unconfirmed payment any more; refresh the inbox")
+        db.resolve_inbox(conn, r["id"], key, reviewer=reviewer, run_id=run_id, decision=decision)
+        res = (payment.confirm_pending if approve else payment.cancel_pending)(conn, key, run_id, reviewer)
+        return {"status": res.status.value, "amount": str(res.amount)}
     inv = db.invoice_row(conn, key.vendor, key.invoice_number)
     findings = findings_for(conn, key)
     proposed = Decision(kind="approve" if approve else "reject", actor=reviewer, reasons=[note])
@@ -146,18 +161,13 @@ def resolve(
         raise InboxError(f"cannot approve: hard findings {', '.join(hard)}")
     if approve and (inv is None or inv["total"] is None):
         raise InboxError("cannot approve: nothing usable was extracted; reject it or reprocess the file")
-    run_id = new_run_id()
-    decision = {"kind": "approve" if approve else "reject", "note": note, "inbox_id": r["id"], "reason": r["reason"]}
     db.resolve_inbox(conn, r["id"], key, reviewer=reviewer, run_id=run_id, decision=decision)
-    if r["reason"] == payment.UNCONFIRMED:  # approve = seen at the bank; reject = not there, retry from the inbox
-        res = (payment.confirm_pending if approve else payment.cancel_pending)(conn, key, run_id, reviewer)
-        return {"status": res.status.value, "amount": str(res.amount)}
     total = Decimal(inv["total"]) if inv and inv["total"] is not None else None
     currency = (inv["currency"] if inv else None) or "USD"
     done = settle.settle(
         conn, key, proposed, findings=findings, total=total, currency=currency,
-        usd_total=fx.to_usd(total, currency, fx.rates(conn)), run_id=run_id,
+        usd_total=fx.to_usd(total, currency, fx.rates(conn)), run_id=run_id, bank=bank,
     )  # fmt: skip
     if done.status == Status.REJECTED:
         return {"status": done.status.value}
-    return {"status": done.status.value, "amount": str(done.amount_paid if done.amount_paid is not None else total)}
+    return {"status": done.status.value, "amount": str(done.amount)}

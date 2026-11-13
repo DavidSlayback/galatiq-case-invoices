@@ -5,7 +5,6 @@ human, ``note`` is informational (D7, D10). The rule table is documented in
 docs/RULES.md.
 """
 
-import json
 import re
 import sqlite3
 from collections import defaultdict
@@ -14,7 +13,7 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 from decimal import Decimal
 
-from invoice_agents import fx, vendors
+from invoice_agents import fx, identity, vendors
 from invoice_agents.approval import AUTO_LIMIT
 from invoice_agents.models import Finding, Invoice, Severity
 from invoice_agents.reconcile import net_days
@@ -49,7 +48,7 @@ class Reference:
             stock={r["item"]: r["stock"] for r in inv},
             price={r["item"]: Decimal(r["unit_price"]) for r in inv},
             vendors={norm(r["name"]): dict(r) for r in vend},
-            aliases={norm(a): r["name"] for r in vend for a in json.loads(r["aliases_json"])},
+            aliases={k: v for k, v in identity.registry(conn).items() if k not in {norm(r["name"]) for r in vend}},
             rates=fx.rates(conn),
         )
 

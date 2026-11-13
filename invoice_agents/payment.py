@@ -9,13 +9,15 @@ stays, and the next attempt sends the invoice to a person to check the bank
 import sqlite3
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import timedelta
 from decimal import Decimal
 
 from invoice_agents import db, ledger
 from invoice_agents.models import EventType, InvoiceKey, Status
 
 ATTEMPTS = 2  # A7
-UNCONFIRMED = "payment_unconfirmed"
+UNCONFIRMED = db.UNCONFIRMED_REASON
+STALE_AFTER = timedelta(minutes=2)  # far longer than a bank call; a pending row this old has no live process
 
 Bank = Callable[[str, Decimal], dict[str, str]]
 
@@ -66,12 +68,9 @@ def pay(
     if state and state[0] == "sent":
         db.record(conn, key, EventType.PAYMENT_SKIPPED_ALREADY_PAID, actor="payment", run_id=run_id)
         return PaymentResult(Status.PAID, Decimal(0))
-    if state:  # pending: an earlier attempt died after (or before) calling the bank, so never guess
-        amount = state[1]
-        if not db.has_open_inbox(conn, key, UNCONFIRMED):
-            db.enqueue_inbox(conn, key, reason=UNCONFIRMED, run_id=run_id, actor="payment", amount_due=amount,
-                             payload={"note": "check the bank before confirming or cancelling"})  # fmt: skip
-        return PaymentResult(Status.ESCALATED, amount)
+    if state and state[0] == "pending":  # an earlier attempt died after (or before) the bank call: never guess
+        _unconfirmed(conn, key, state[1], run_id, "an earlier attempt did not finish")
+        return PaymentResult(Status.ESCALATED, state[1])
     amount = total - ledger.already_paid(conn, key.vendor, key.invoice_number)
     if amount <= 0:  # B6: a revision below what was paid is a credit to recover, never a bank payment
         db.record(conn, key, EventType.PAYMENT_SKIPPED_ALREADY_PAID, actor="payment", run_id=run_id,
@@ -79,20 +78,24 @@ def pay(
         return PaymentResult(Status.PAID, Decimal(0))
     # Scale the USD figure to the amount actually sent (a revision delta pays only part of the total).
     usd = (amount * usd_equivalent / total).quantize(Decimal("0.01")) if usd_equivalent and total else amount
-    db.start_payment(conn, key, amount, currency, usd)
+    attempt = db.start_payment(conn, key, amount, currency, usd)
+    if attempt is None:  # another process claimed this payment between our check and now: never call the bank
+        return PaymentResult(Status.ESCALATED, amount)
     errors: list[str] = []
     for _ in range(ATTEMPTS):
         try:
-            if bank(key.vendor, amount).get("status") == "success":
-                break
-            errors.append("bank returned non-success")
-        except Exception as e:  # the bank is an external boundary; any failure is retried, then escalated
-            errors.append(f"{type(e).__name__}: {e}")
+            reply = bank(key.vendor, amount)
+        except Exception as e:  # a timeout or dropped connection may hide a payment that went out: never retry
+            _unconfirmed(conn, key, amount, run_id, f"{type(e).__name__}: {e}")
+            return PaymentResult(Status.ESCALATED, amount)
+        if reply.get("status") == "success":
+            break
+        errors.append("bank returned non-success")  # a definite refusal: nothing was sent, so retrying is safe
     else:
-        db.fail_payment(conn, key, run_id=run_id, actor="payment", amount=amount,
+        db.fail_payment(conn, key, attempt, run_id=run_id, actor="payment", amount=amount,
                         payload={"amount": amount, "currency": currency, "errors": errors})  # fmt: skip
         return PaymentResult(Status.PAYMENT_FAILED, amount)
-    db.settle_payment(conn, key, run_id=run_id, actor="payment",
+    db.settle_payment(conn, key, attempt, run_id=run_id, actor="payment",
                       payload={"amount": amount, "currency": currency, "usd_equivalent": usd})  # fmt: skip
     return PaymentResult(Status.PAID, amount)
 
@@ -103,7 +106,10 @@ def confirm_pending(conn: sqlite3.Connection, key: InvoiceKey, run_id: str, acto
     if state is None or state[0] != "pending":
         raise ValueError(f"no unconfirmed payment for {key}")
     amount = state[1]
-    db.settle_payment(conn, key, run_id=run_id, actor=actor, payload={"amount": amount, "confirmed_at_bank": True})
+    attempt = db.payment_attempt(conn, key)
+    assert attempt is not None
+    db.settle_payment(conn, key, attempt, run_id=run_id, actor=actor,
+                      payload={"amount": amount, "confirmed_at_bank": True})  # fmt: skip
     return PaymentResult(Status.PAID, amount)
 
 
@@ -113,6 +119,27 @@ def cancel_pending(conn: sqlite3.Connection, key: InvoiceKey, run_id: str, actor
     if state is None or state[0] != "pending":
         raise ValueError(f"no unconfirmed payment for {key}")
     amount = state[1]
-    db.fail_payment(conn, key, run_id=run_id, actor=actor, amount=amount,
+    attempt = db.payment_attempt(conn, key)
+    assert attempt is not None
+    db.fail_payment(conn, key, attempt, run_id=run_id, actor=actor, amount=amount,
                     payload={"amount": amount, "errors": ["not found at the bank"]})  # fmt: skip
     return PaymentResult(Status.PAYMENT_FAILED, amount)
+
+
+def _unconfirmed(conn: sqlite3.Connection, key: InvoiceKey, amount: Decimal, run_id: str, why: str) -> None:
+    if not db.has_open_inbox(conn, key, UNCONFIRMED):
+        db.enqueue_inbox(conn, key, reason=UNCONFIRMED, run_id=run_id, actor="payment", amount_due=amount,
+                         payload={"error": why, "note": "check the bank before confirming or cancelling"})  # fmt: skip
+
+
+def sweep_unconfirmed(conn: sqlite3.Connection, run_id: str, older_than: timedelta = STALE_AFTER) -> int:
+    """Send every stale pending payment to a person; returns how many were found.
+
+    A process that dies mid-payment leaves a pending row and nothing else, and re-running the
+    file is a duplicate, so this sweep (run before processing and when the inbox is listed) is
+    what surfaces it.
+    """
+    stale = db.stale_pending(conn, older_than)
+    for key, amount in stale:
+        _unconfirmed(conn, key, amount, run_id, "payment started but never finished")
+    return len(stale)

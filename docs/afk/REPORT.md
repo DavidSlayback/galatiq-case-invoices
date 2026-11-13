@@ -59,6 +59,6 @@ Run started and finished on 2026-11-12 (one session, with one restart). All 19 t
 ## Follow-ups (not started)
 
 - Purchase-order three-way match, replacing the literal stock check (D1).
-- ~~An idempotency key at the bank call~~: done as the pending-payment outbox (D41, 2026-11-13).
+- An idempotency key at the bank call. The pending-payment outbox (D41, D45) means a crash or timeout never re-sends silently, and every late send is recorded. Only a bank-side key stops two sends in a retry race.
 - Agent function tools (for example, the VP looking up vendor history) if graders weight "tool use" literally.
 - Auto-detect should check that a CLI is logged in before choosing it (B9; documented for now).

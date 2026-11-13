@@ -33,8 +33,17 @@ def core(inv: Invoice) -> dict[str, Any]:
 
 
 def conflicts(a: dict[str, Any], b: dict[str, Any]) -> list[str]:
-    """Core fields stated in both and different; a field missing on one side is compatible."""
-    return [k for k in CORE_FIELDS if a.get(k) is not None and b.get(k) is not None and a[k] != b[k]]
+    """Core fields stated in both and different; a field missing on one side is compatible.
+
+    Vendor names compare without case or spacing (D36) but with NFKC differences kept,
+    so a full-width or alias spelling is a conflict while "WIDGETS  INC." is a duplicate.
+    """
+
+    def differ(k: str) -> bool:
+        x, y = a[k], b[k]
+        return identity.plain(x) != identity.plain(y) if k == "vendor" else x != y
+
+    return [k for k in CORE_FIELDS if a.get(k) is not None and b.get(k) is not None and differ(k)]
 
 
 def diff(old: dict[str, Any], new: dict[str, Any]) -> dict[str, Any]:
@@ -105,7 +114,10 @@ def check(conn: sqlite3.Connection, key: InvoiceKey, inv: Invoice) -> Check:
     if inv.revision < row["revision"]:
         return Stale(row["revision"])
     inbox = conn.execute(
-        "SELECT id FROM inbox WHERE vendor=? AND invoice_number=? AND status='open'", (key.vendor, key.invoice_number)
+        # Payment items stay open: a revision must not hide money that may already have left.
+        "SELECT id FROM inbox WHERE vendor=? AND invoice_number=? AND status='open'"
+        " AND reason NOT IN ('payment_unconfirmed', 'payment_failed', 'overpayment')",
+        (key.vendor, key.invoice_number),
     ).fetchall()
     return Revision(
         previous_revision=row["revision"],
@@ -144,8 +156,12 @@ def split_findings(conn: sqlite3.Connection, key: InvoiceKey, inv: Invoice, limi
 
 
 def already_paid(conn: sqlite3.Connection, vendor: str, invoice_number: str) -> Decimal:
-    """Total paid so far across every revision and copy of one invoice (B7: conflicts count too)."""
-    rows = conn.execute("SELECT invoice_number, amount_paid FROM payments WHERE vendor=?", (vendor,)).fetchall()
+    """Total paid or possibly paid (pending), plus overpayments, across every revision and copy (B7)."""
+    rows = conn.execute(
+        "SELECT invoice_number, amount_paid FROM payments WHERE vendor=? AND status<>'cancelled'"
+        " UNION ALL SELECT invoice_number, amount FROM overpayments WHERE vendor=?",
+        (vendor, vendor),
+    ).fetchall()
     return sum((Decimal(r[1]) for r in rows if identity.same_invoice(r[0], invoice_number)), Decimal(0))
 
 
