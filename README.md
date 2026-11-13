@@ -125,6 +125,7 @@ Every decision, its reason, and whether David or the agent made it is in [docs/D
 - **Stock reservation.** Approved invoices don't consume stock (D3), so every invoice is checked against the seeded stock.
 - **Payment idempotency at the bank.** The ledger is idempotent, but a crash between the bank call and the ledger write could double-pay. A real bank API needs an idempotency key.
 - **Scale.** SQLite and one process are fine for a prototype; production needs a queue and Postgres.
+- **Database tools.** The key columns use a custom collation (`FOLD`, D40). Other SQLite tools must register it, with `invoice_agents.identity.register(conn)`, before they can filter or write those columns.
 - **The test set is small.** It has 27 invoices, deliberately full of problems, so the measured rates are evidence, not a forecast.
 
 ## Repository map

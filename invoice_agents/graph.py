@@ -16,7 +16,7 @@ from pydantic_ai.exceptions import UnexpectedModelBehavior
 from pydantic_ai.messages import ModelMessage
 from pydantic_graph import GraphBuilder, StepContext
 
-from invoice_agents import approval, db, fx, identity, ledger, reconcile, rules, settle
+from invoice_agents import approval, db, fx, identity, ledger, payment, reconcile, rules, settle
 from invoice_agents.agents import extractor, reviewers
 from invoice_agents.approval import Approve, AutoApprove, HumanReview, Objected, Proposed, Reject, VpReview
 from invoice_agents.loaders import LoadError, load
@@ -383,6 +383,7 @@ async def process(
 ) -> Outcome:
     """Run one file through the whole graph; ``bank`` is the payment adapter."""
     run_id = run_id or new_run_id()
+    payment.sweep_unconfirmed(conn, run_id)
     state = State(path=path, run_id=run_id)
     deps = Deps(conn, settings, Tracer(settings.runs_dir, run_id), bank)
     outcome = await graph.run(state=state, deps=deps, inputs=path)

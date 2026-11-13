@@ -67,7 +67,7 @@ def test_reviewer_cancels_then_approves_the_retry_which_pays_once(conn: sqlite3.
 def test_failed_payment_and_its_inbox_item_commit_together(conn: sqlite3.Connection):
     conn.execute("CREATE TRIGGER no_inbox BEFORE INSERT ON inbox BEGIN SELECT RAISE(ABORT, 'disk full'); END")
     with pytest.raises(sqlite3.IntegrityError):
-        payment.pay(conn, KEY, Decimal(100), "USD", None, "r1", recording_bank(ConnectionError("down"))[0])
+        payment.pay(conn, KEY, Decimal(100), "USD", None, "r1", recording_bank({"status": "declined"})[0])
     assert [e["event"] for e in db.events(conn, *KEY[:2])] == []  # no PAYMENT_FAILED without its inbox item
     assert db.payment_state(conn, KEY) == ("pending", Decimal(100))  # the evidence survives the rollback
 

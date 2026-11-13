@@ -39,12 +39,20 @@ def test_revision_pays_only_the_difference(conn: sqlite3.Connection):
     assert ledger.already_paid(conn, KEY.vendor, KEY.invoice_number) == Decimal("5940.00")
 
 
-def test_failures_retry_then_escalate(conn: sqlite3.Connection):
-    bank, calls = calls_recorder(ConnectionError("bank down"))
+def test_refusals_retry_then_escalate(conn: sqlite3.Connection):
+    bank, calls = calls_recorder({"status": "declined"})
     res = payment.pay(conn, KEY, Decimal("100"), "USD", None, "r1", bank)
     assert res.status == Status.PAYMENT_FAILED and len(calls) == payment.ATTEMPTS == 2
     assert conn.execute("SELECT reason FROM inbox").fetchone()[0] == "payment_failed"
     assert conn.execute("SELECT count(*) FROM payments").fetchone()[0] == 0
+
+
+def test_an_exception_is_ambiguous_so_it_is_never_retried(conn: sqlite3.Connection):
+    bank, calls = calls_recorder(TimeoutError("no reply"))
+    res = payment.pay(conn, KEY, Decimal("100"), "USD", None, "r1", bank)
+    assert res.status == Status.ESCALATED and len(calls) == 1
+    assert conn.execute("SELECT reason FROM inbox").fetchone()[0] == payment.UNCONFIRMED
+    assert db.payment_state(conn, KEY) == ("pending", Decimal("100"))  # the evidence is kept
 
 
 def test_eur_paid_in_invoice_currency_with_usd_recorded(conn: sqlite3.Connection):
@@ -61,7 +69,7 @@ def test_rejection_names_bad_lines(conn: sqlite3.Connection, offline: Settings):
 
 
 def test_bank_failure_through_the_graph_goes_to_the_inbox(conn: sqlite3.Connection, offline: Settings):
-    bank, calls = calls_recorder(ConnectionError("bank down"))
+    bank, calls = calls_recorder({"status": "declined"})
     o = graph.process_sync(INVOICES / "invoice_1004.json", offline, conn, bank=bank)
     assert o.status == Status.PAYMENT_FAILED and len(calls) == payment.ATTEMPTS
     assert conn.execute("SELECT reason FROM inbox").fetchone()[0] == "payment_failed"

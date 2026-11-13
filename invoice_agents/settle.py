@@ -20,6 +20,7 @@ class Settled:
     decision: Decision
     status: Status
     amount_paid: Decimal | None = None
+    amount: Decimal | None = None  # what payment attempted: the delta for a revision, also when it failed
 
 
 def bad_lines(findings: list[Finding]) -> list[str]:
@@ -72,4 +73,4 @@ def settle(
         return Settled(final, Status.REJECTED)
     assert total is not None
     res = payment.pay(conn, key, total, currency, usd_total, run_id, bank)
-    return Settled(final, res.status, res.amount if res.status == Status.PAID else None)
+    return Settled(final, res.status, res.amount if res.status == Status.PAID else None, res.amount)

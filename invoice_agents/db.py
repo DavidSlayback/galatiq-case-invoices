@@ -8,7 +8,8 @@ SQL against those tables. Triggers make the event table append-only.
 
 import json
 import sqlite3
-from datetime import UTC, datetime
+import unicodedata
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
@@ -17,6 +18,7 @@ from invoice_agents import identity
 from invoice_agents.models import EventType, Finding, InvoiceKey, Status
 
 SCHEMA = """
+CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS inventory (
     item TEXT PRIMARY KEY, stock INTEGER NOT NULL, unit_price TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS vendors (
@@ -69,7 +71,17 @@ def connect(path: Path | str) -> sqlite3.Connection:
     conn.row_factory = sqlite3.Row
     identity.register(conn)
     conn.execute("PRAGMA journal_mode=WAL")
+    old = conn.execute("SELECT sql FROM sqlite_master WHERE name='invoices'").fetchone()
+    if old and "NOCASE" in old[0]:  # keys made before D40 would not meet their new spellings: refuse, never re-pay
+        conn.close()
+        raise RuntimeError(f"{path} predates the FOLD identity rule (D40); run `python main.py reset` to rebuild it")
     conn.executescript(SCHEMA)
+    # FOLD's order comes from Python's Unicode tables: rebuild the key indexes if they changed.
+    ver = conn.execute("SELECT value FROM meta WHERE key='unicode'").fetchone()
+    if ver is None or ver[0] != unicodedata.unidata_version:
+        with conn:
+            conn.execute("REINDEX FOLD")
+            conn.execute("INSERT OR REPLACE INTO meta VALUES ('unicode', ?)", (unicodedata.unidata_version,))
     cols = {r[1] for r in conn.execute("PRAGMA table_info(payments)")}
     if "status" not in cols:  # databases made before pending payments existed
         conn.execute("ALTER TABLE payments ADD COLUMN status TEXT NOT NULL DEFAULT 'sent'")
@@ -223,10 +235,15 @@ def start_payment(conn: sqlite3.Connection, key: InvoiceKey, amount: Decimal, cu
 def settle_payment(
     conn: sqlite3.Connection, key: InvoiceKey, *, run_id: str, actor: str, payload: dict[str, Any]
 ) -> None:
-    """Mark the pending payment sent and record PAID, in one transaction."""
+    """Mark the pending payment sent, record PAID and close any unconfirmed-payment item, in one transaction."""
     with conn:
         conn.execute(
             "UPDATE payments SET status='sent', ts=? WHERE vendor=? AND invoice_number=? AND revision=?",
+            (now(), *key),
+        )
+        conn.execute(
+            "UPDATE inbox SET status='withdrawn', resolved_ts=?, note='payment confirmed'"
+            " WHERE vendor=? AND invoice_number=? AND revision=? AND reason='payment_unconfirmed' AND status='open'",
             (now(), *key),
         )
         _record(conn, key, EventType.PAID, actor, run_id, payload, Status.PAID, {})
@@ -277,3 +294,13 @@ def resolve_inbox(
         conn.execute(
             "UPDATE inbox SET status='resolved', resolved_ts=?, note=? WHERE id=?", (now(), decision["note"], inbox_id)
         )
+
+
+def stale_pending(conn: sqlite3.Connection, older_than: timedelta) -> list[tuple[InvoiceKey, Decimal]]:
+    """Pending payments started longer ago than ``older_than``: their process most likely died."""
+    cutoff = (datetime.now(UTC) - older_than).isoformat(timespec="milliseconds")
+    rows = conn.execute(
+        "SELECT vendor, invoice_number, revision, amount_paid FROM payments WHERE status='pending' AND ts<=?",
+        (cutoff,),
+    ).fetchall()
+    return [(InvoiceKey(r[0], r[1], r[2]), Decimal(r[3])) for r in rows]
