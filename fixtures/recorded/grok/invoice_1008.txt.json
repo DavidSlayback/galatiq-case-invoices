@@ -30,7 +30,7 @@
   "shipping": null,
   "total": "9900.00",
   "payment_terms": null,
-  "notes": null,
+  "notes": "Please process at your earliest convenience.",
   "remit_to": null,
   "provenance": {
     "vendor": "llm",
@@ -46,7 +46,7 @@
     "shipping": "missing",
     "total": "llm",
     "payment_terms": "missing",
-    "notes": "missing",
+    "notes": "llm",
     "remit_to": "missing"
   }
 }

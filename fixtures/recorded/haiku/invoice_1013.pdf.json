@@ -78,7 +78,7 @@
   "shipping": null,
   "total": "22562.80",
   "payment_terms": "Net 60",
-  "notes": "Document title: Bulk Order Invoice. Tax label as written: \"Tax (7%)\". Grand Total label as written: \"Grand Total\". Re-checked: each line's quantity x unit price equals its amount, and the eight line amounts sum to $21,040.00, matching the stated subtotal. Document does not reconcile: subtotal $21,040.00 + tax $1,472.80 = $22,512.80, but the stated Grand Total is $22,562.80 (difference $50.00). No shipping line is shown. The document's values are kept exactly as written and not corrected; the discrepancy is flagged for review. Currency: only the $ symbol appears, no ISO code is stated.",
+  "notes": "Re-checked against the document. All eight line amounts match qty x unit price and sum to the stated subtotal of $21,040.00. Tax (7%) of $1,472.80 matches 7% of the subtotal. The document's Grand Total of $22,562.80 does not equal subtotal + tax ($22,512.80); a $50.00 difference is present on the document itself. Total kept exactly as written; flag for AP review. Tax label as written: \"Tax (7%)\". Line notes are from the Notes column. No shipping, currency, revision, or remittance details appear on the document.",
   "remit_to": null,
   "provenance": {
     "vendor": "llm",

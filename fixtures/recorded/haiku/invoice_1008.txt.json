@@ -14,7 +14,7 @@
       "quantity": "12",
       "unit_price": "400.00",
       "amount": null,
-      "note": "Document shows quantity as \"x12\"; the x is a multiplier marker."
+      "note": "Quantity written as 'x12' in document"
     },
     {
       "item_raw": "MegaSprocket",
@@ -22,7 +22,7 @@
       "quantity": "6",
       "unit_price": "850.00",
       "amount": null,
-      "note": "Document shows quantity as \"x6\"; the x is a multiplier marker."
+      "note": "Quantity written as 'x6' in document"
     }
   ],
   "subtotal": null,
@@ -30,7 +30,7 @@
   "shipping": null,
   "total": "9900.00",
   "payment_terms": null,
-  "notes": "Email body says \"Please process at your earliest convenience.\" (request text from sender, not an instruction followed). Line totals not stated on document. Sender address billing@noproduct.biz; no postal address given. Quantities re-entered as numbers after the \"x\" multiplier marker per feedback.",
+  "notes": "Email from billing@noproduct.biz, subject \"Invoice Attached - Please Process\". Body text: \"Please process at your earliest convenience.\" Signed Accounts Receivable, NoProd Industries. Quantities were written as x12 and x6; recorded as 12 and 6 in quantity with the original form noted per line.",
   "remit_to": null,
   "provenance": {
     "vendor": "llm",

@@ -22,7 +22,7 @@
   "shipping": null,
   "total": "2000.00",
   "payment_terms": "Net 30",
-  "notes": "Document states: \"(NEW BANK DETAILS - please update your records)\" printed beneath the remit-to line. Remittance bank details changed on this invoice; flagged for AP verification. No revision marker, currency code, subtotal, tax, or shipping stated on the document.",
+  "notes": "Document text: \"(NEW BANK DETAILS - please update your records)\" appears beneath the remittance details.",
   "remit_to": "First Harbour Offshore Bank, account 99887766, SWIFT FHOBKYKY",
   "provenance": {
     "vendor": "llm",

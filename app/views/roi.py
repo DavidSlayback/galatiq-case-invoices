@@ -36,10 +36,12 @@ with left:
     days = st.number_input("Current processing time (days)", value=d.current_cycle_days, step=0.5)
     st.markdown("**Measured**")
     cost = st.number_input(
-        "Model cost per invoice ($)", value=0.044, step=0.01, format="%.3f",
+        "Model cost per invoice ($)", value=0.046, step=0.01, format="%.3f",
         help="Live Grok 4.7 run over all 27 test invoices, at published API prices (docs/live).",
     )  # fmt: skip
-    secs = st.number_input("Processing time per invoice (s)", value=26.0, help="Live Grok run: 11.7 min / 27 invoices.")
+    secs = st.number_input(
+        "Processing time per invoice (s)", value=24.0, help="Live Grok run, 2026-11-13: 10.6 min / 27 invoices."
+    )
     st.metric("Sent to a person (eval)", f"{esc:.0%}", help=f"Share of the {n} test invoices escalated to the inbox.")
     st.metric("Planted problems caught (eval)", f"{catch:.0%}")
 with right:

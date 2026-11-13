@@ -14,7 +14,7 @@ Expectations: [eval/expected_outcomes.yaml](../eval/expected_outcomes.yaml).
 | invoice_1006.csv | PASS | paid | paid | rules | - |
 | invoice_1007.csv | PASS | rejected | rejected | rules | ARITHMETIC_MISMATCH, STOCK_EXCEEDED |
 | invoice_1008.txt | PASS | rejected | rejected | rules | NEAR_THRESHOLD, PAST_DUE, UNKNOWN_ITEM, UNKNOWN_VENDOR, VENDOR_RISK |
-| invoice_1009.json | PASS | rejected | rejected | rules | ARITHMETIC_MISMATCH, MISSING_DUE_DATE, MISSING_VENDOR, NEGATIVE_QUANTITY |
+| invoice_1009.json | PASS | rejected | rejected | rules | ARITHMETIC_MISMATCH, MISSING_DUE_DATE, MISSING_VENDOR, NEGATIVE_QUANTITY, NON_POSITIVE_TOTAL |
 | invoice_1010.txt | PASS | paid | paid | vp_agent | PRICE_OVER_CATALOG |
 | invoice_1011.pdf | PASS | paid | paid | rules | - |
 | invoice_1011.txt | PASS | duplicate_skipped | duplicate_skipped | ledger | - |
@@ -35,34 +35,34 @@ Expectations: [eval/expected_outcomes.yaml](../eval/expected_outcomes.yaml).
 
 ## Live model usage and extraction differences from the goldens
 
-Total: 40 model calls, 37,600 tokens, 3.5 minutes.
+Total: 50 model calls, 58,189 tokens, 5.3 minutes.
 
 | File | Calls | Tokens | Seconds | Extraction differences |
 |---|---|---|---|---|
-| invoice_1001.txt | 3 | 2,486 | 16 | none |
-| invoice_1002.txt | 1 | 828 | 4 | none |
-| invoice_1003.txt | 1 | 842 | 5 | none |
-| invoice_1004.json | 1 | 895 | 5 | none |
-| invoice_1004_revised.json | 1 | 1,018 | 6 | none |
-| invoice_1005.json | 1 | 912 | 5 | none |
-| invoice_1006.csv | 1 | 839 | 5 | none |
-| invoice_1007.csv | 3 | 3,212 | 19 | none |
-| invoice_1008.txt | 2 | 1,752 | 9 | none |
-| invoice_1009.json | 3 | 3,450 | 20 | none |
-| invoice_1010.txt | 3 | 3,154 | 21 | none |
-| invoice_1011.pdf | 1 | 500 | 3 | none |
-| invoice_1011.txt | 1 | 794 | 4 | none |
-| invoice_1012.pdf | 1 | 1,389 | 6 | none |
-| invoice_1012.txt | 1 | 1,262 | 6 | none |
-| invoice_1013.json | 3 | 4,260 | 18 | none |
-| invoice_1013.pdf | 3 | 4,632 | 20 | none |
-| invoice_1014.xml | 1 | 397 | 3 | none |
-| invoice_1015.csv | 1 | 966 | 5 | none |
-| invoice_1016.json | 1 | 485 | 3 | none |
-| invoice_1011_scan.pdf | 1 | 365 | 4 | none |
-| invoice_2001_injection.txt | 1 | 377 | 3 | none |
-| invoice_2002_split_a.txt | 1 | 261 | 3 | none |
-| invoice_2003_split_b.txt | 1 | 787 | 4 | none |
-| invoice_2004_lookalike.txt | 1 | 518 | 3 | none |
-| invoice_2005_bank_change.txt | 1 | 700 | 4 | none |
-| invoice_2006_control.txt | 1 | 519 | 4 | none |
+| invoice_1001.txt | 4 | 4,798 | 28 | none |
+| invoice_1002.txt | 1 | 885 | 4 | none |
+| invoice_1003.txt | 1 | 627 | 4 | none |
+| invoice_1004.json | 1 | 930 | 5 | none |
+| invoice_1004_revised.json | 1 | 1,010 | 5 | none |
+| invoice_1005.json | 1 | 1,006 | 6 | none |
+| invoice_1006.csv | 1 | 769 | 4 | none |
+| invoice_1007.csv | 3 | 3,498 | 22 | none |
+| invoice_1008.txt | 3 | 3,157 | 16 | none |
+| invoice_1009.json | 3 | 3,259 | 19 | none |
+| invoice_1010.txt | 11 | 19,634 | 107 | none |
+| invoice_1011.pdf | 1 | 558 | 4 | none |
+| invoice_1011.txt | 1 | 594 | 4 | none |
+| invoice_1012.pdf | 1 | 1,181 | 6 | none |
+| invoice_1012.txt | 1 | 1,104 | 5 | none |
+| invoice_1013.json | 3 | 4,275 | 19 | none |
+| invoice_1013.pdf | 3 | 4,371 | 18 | none |
+| invoice_1014.xml | 1 | 669 | 4 | none |
+| invoice_1015.csv | 1 | 711 | 4 | none |
+| invoice_1016.json | 1 | 890 | 5 | none |
+| invoice_1011_scan.pdf | 1 | 848 | 8 | none |
+| invoice_2001_injection.txt | 1 | 603 | 4 | none |
+| invoice_2002_split_a.txt | 1 | 495 | 3 | none |
+| invoice_2003_split_b.txt | 1 | 683 | 3 | none |
+| invoice_2004_lookalike.txt | 1 | 258 | 3 | none |
+| invoice_2005_bank_change.txt | 1 | 847 | 5 | none |
+| invoice_2006_control.txt | 1 | 529 | 3 | none |
