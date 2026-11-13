@@ -1,8 +1,8 @@
 """Human review of escalated invoices (D19, A3).
 
-A decision needs a note, writes a ``human_decision`` event, and then runs the
-same payment or rejection code the graph uses. Nothing pauses a graph run, so
-resolving is a short follow-on step from the stored state.
+A decision needs a note, writes a ``human_decision`` event, and then settles
+through :mod:`invoice_agents.settle`, the same step that ends a graph run, so
+the guardrail and the audit trail do not depend on who decided (D19, D42).
 """
 
 import json
@@ -11,8 +11,8 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any
 
-from invoice_agents import db, fx, identity, payment
-from invoice_agents.models import EventType, InvoiceKey, Status
+from invoice_agents import approval, db, fx, identity, payment, settle
+from invoice_agents.models import Decision, Finding, InvoiceKey, Status
 from invoice_agents.trace import new_run_id
 
 
@@ -50,14 +50,22 @@ def _latest_findings(conn: sqlite3.Connection, key: InvoiceKey) -> list[sqlite3.
     ).fetchall()
 
 
-def _reasoning(conn: sqlite3.Connection, key: InvoiceKey) -> list[str]:
+def findings_for(conn: sqlite3.Connection, key: InvoiceKey) -> list[Finding]:
+    """The invoice's findings from its most recent run, as the settlement module takes them."""
+    return [
+        Finding(rule_id=f["rule_id"], severity=f["severity"], message=f["message"], evidence=json.loads(f["evidence"]))
+        for f in _latest_findings(conn, key)
+    ]
+
+
+def _reasoning(conn: sqlite3.Connection, key: InvoiceKey, reason: str) -> list[str]:
     """Reasons from the most recent decision, plus the critic's last objections if the review deadlocked."""
     row = conn.execute(
         "SELECT payload FROM invoice_events WHERE vendor=? AND invoice_number=? AND event='decided' ORDER BY id DESC",
         (key.vendor, key.invoice_number),
     ).fetchone()
-    # The first reason is the escalation code (already shown as "why"); the rest is the substance.
-    return list(json.loads(row[0]).get("reasons", []))[1:] if row else []
+    # The escalation reason is already shown as "why"; the rest is the substance.
+    return [x for x in json.loads(row[0]).get("reasons", []) if x != reason] if row else []
 
 
 def list_open(conn: sqlite3.Connection) -> list[Item]:
@@ -74,7 +82,7 @@ def list_open(conn: sqlite3.Connection) -> list[Item]:
                 total=inv["total"] if inv else None, currency=inv["currency"] if inv else None,
                 amount_due=r["amount_due"], risk=risk,
                 flags=sorted({f["rule_id"] for f in findings if f["severity"] != "note"}),
-                reasoning=_reasoning(conn, key), created=r["created_ts"],
+                reasoning=_reasoning(conn, key, r["reason"]), created=r["created_ts"],
             )
         )  # fmt: skip
     return out
@@ -131,8 +139,10 @@ def resolve(
     r = _find(conn, invoice_number, vendor, inbox_id)
     key = InvoiceKey(r["vendor"], r["invoice_number"], r["revision"])
     inv = db.invoice_row(conn, key.vendor, key.invoice_number)
-    hard = [f["rule_id"] for f in _latest_findings(conn, key) if f["severity"] == "hard"]
-    if approve and hard:  # D15: approval with a hard finding is impossible, for humans too
+    findings = findings_for(conn, key)
+    proposed = Decision(kind="approve" if approve else "reject", actor=reviewer, reasons=[note])
+    if approval.guard(proposed, findings)[1]:  # D15: approval with a hard finding is impossible, for humans too
+        hard = [f.rule_id for f in findings if f.severity == "hard"]
         raise InboxError(f"cannot approve: hard findings {', '.join(hard)}")
     if approve and (inv is None or inv["total"] is None):
         raise InboxError("cannot approve: nothing usable was extracted; reject it or reprocess the file")
@@ -142,14 +152,12 @@ def resolve(
     if r["reason"] == payment.UNCONFIRMED:  # approve = seen at the bank; reject = not there, retry from the inbox
         res = (payment.confirm_pending if approve else payment.cancel_pending)(conn, key, run_id, reviewer)
         return {"status": res.status.value, "amount": str(res.amount)}
-    if not approve:
-        db.record(
-            conn, key, EventType.REJECTED, actor=reviewer, run_id=run_id,
-            payload={"reasons": [note]}, status=Status.REJECTED,
-        )  # fmt: skip
-        return {"status": Status.REJECTED.value}
-    assert inv is not None
-    total = Decimal(inv["total"])
-    usd = fx.to_usd(total, inv["currency"] or "USD", fx.rates(conn))
-    res = payment.pay(conn, key, total, inv["currency"] or "USD", usd, run_id)
-    return {"status": res.status.value, "amount": str(res.amount)}
+    total = Decimal(inv["total"]) if inv and inv["total"] is not None else None
+    currency = (inv["currency"] if inv else None) or "USD"
+    done = settle.settle(
+        conn, key, proposed, findings=findings, total=total, currency=currency,
+        usd_total=fx.to_usd(total, currency, fx.rates(conn)), run_id=run_id,
+    )  # fmt: skip
+    if done.status == Status.REJECTED:
+        return {"status": done.status.value}
+    return {"status": done.status.value, "amount": str(done.amount_paid if done.amount_paid is not None else total)}
