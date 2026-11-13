@@ -72,9 +72,14 @@ UNCONFIRMED_REASON = "payment_unconfirmed"  # inbox reason: a bank call whose ou
 STALE_AFTER = timedelta(minutes=2)
 
 
+def cutoff(older_than: timedelta) -> str:
+    """The :func:`now`-format timestamp ``older_than`` ago; anything at or before it is stale."""
+    return (datetime.now(UTC) - older_than).isoformat(timespec="milliseconds")
+
+
 def is_stale(ts: str, older_than: timedelta = STALE_AFTER) -> bool:
     """Whether an ISO timestamp written by :func:`now` is older than ``older_than``."""
-    return ts <= (datetime.now(UTC) - older_than).isoformat(timespec="milliseconds")
+    return ts <= cutoff(older_than)
 
 
 def now() -> str:

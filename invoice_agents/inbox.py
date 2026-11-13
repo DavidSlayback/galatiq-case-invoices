@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any
 
-from invoice_agents import approval, db, fx, identity, payment, settle
+from invoice_agents import approval, db, fx, identity, ledger, payment, settle
 from invoice_agents.models import Decision, Finding, InvoiceKey, Status
 from invoice_agents.trace import new_run_id
 
@@ -69,7 +69,9 @@ def _reasoning(conn: sqlite3.Connection, key: InvoiceKey, reason: str) -> list[s
 
 def list_open(conn: sqlite3.Connection) -> list[Item]:
     """Open inbox items, oldest first (after surfacing any payment a dead process left pending)."""
-    payment.sweep_unconfirmed(conn, new_run_id())
+    run_id = new_run_id()
+    payment.sweep_unconfirmed(conn, run_id)
+    ledger.sweep_unsettled_decisions(conn, run_id)
     out: list[Item] = []
     for r in conn.execute("SELECT * FROM inbox WHERE status='open' ORDER BY id").fetchall():
         key = InvoiceKey(r["vendor"], r["invoice_number"], r["revision"])
