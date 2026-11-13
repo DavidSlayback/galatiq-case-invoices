@@ -181,3 +181,23 @@ def test_r16_a_late_success_while_the_retry_is_pending_then_declined_is_the_only
     assert db.payment_state(conn, key) == ("sent", Decimal(100))
     assert ledger.already_paid(conn, key.vendor, key.invoice_number) == Decimal(100)
     assert inbox.list_open(conn) == []  # no false clawback, no stale retry
+
+
+def test_r17_an_invoice_a_crash_left_after_its_decision_is_resumed_by_a_rerun(
+    conn: sqlite3.Connection, offline: Settings, monkeypatch: pytest.MonkeyPatch
+):
+    """DECIDED is written, then the process dies before payment starts; re-running the file finishes it."""
+    from invoice_agents import settle
+
+    def dies(*_: object) -> None:
+        raise Crash
+
+    monkeypatch.setattr(settle.payment, "pay", dies)  # dies right after DECIDED
+    with pytest.raises(Crash):
+        graph.process_sync(INVOICES / "invoice_1004.json", offline, conn)
+    monkeypatch.undo()
+    assert graph.process_sync(INVOICES / "invoice_1004.json", offline, conn).status == Status.DUPLICATE_SKIPPED
+    with conn:  # an hour later nothing has moved
+        conn.execute("UPDATE invoices SET updated_at='2000-01-01T00:00:00'")
+    again = graph.process_sync(INVOICES / "invoice_1004.json", offline, conn)
+    assert again.status == Status.PAID and db.payment_state(conn, again.key) == ("sent", Decimal("1890.00"))

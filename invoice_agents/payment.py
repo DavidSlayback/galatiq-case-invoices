@@ -18,7 +18,7 @@ from invoice_agents.models import EventType, InvoiceKey, Status
 
 ATTEMPTS = 2  # A7
 UNCONFIRMED = db.UNCONFIRMED_REASON
-STALE_AFTER = timedelta(minutes=2)  # far longer than a bank call; a pending row this old has no live process
+STALE_AFTER = db.STALE_AFTER
 
 Bank = Callable[[str, Decimal], dict[str, str]]
 

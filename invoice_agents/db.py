@@ -61,6 +61,16 @@ CREATE TABLE IF NOT EXISTS inbox (
 UNCONFIRMED_REASON = "payment_unconfirmed"  # inbox reason: a bank call whose outcome nobody saw
 
 
+# Far longer than one invoice's run or one bank call: a pending payment or an unfinished
+# invoice this old has no live process behind it.
+STALE_AFTER = timedelta(minutes=2)
+
+
+def is_stale(ts: str, older_than: timedelta = STALE_AFTER) -> bool:
+    """Whether an ISO timestamp written by :func:`now` is older than ``older_than``."""
+    return ts <= (datetime.now(UTC) - older_than).isoformat(timespec="milliseconds")
+
+
 def now() -> str:
     """UTC timestamp in ISO 8601."""
     return datetime.now(UTC).isoformat(timespec="milliseconds")

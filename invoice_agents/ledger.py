@@ -100,6 +100,27 @@ class Stale:
 Check = New | Duplicate | Conflict | Revision | Stale
 
 
+# Statuses a run passes through on its way to an outcome. An invoice left in one of them
+# (or escalated with its inbox item already answered) was cut off mid-run.
+_IN_FLIGHT = ("received", "extracted", "validated", "escalated")
+
+
+def _interrupted(conn: sqlite3.Connection, key: InvoiceKey, row: sqlite3.Row) -> bool:
+    """A run died after recording this invoice but before it reached an outcome (D46).
+
+    True only when nothing else will finish it: the row has not moved for longer than
+    a run takes, no inbox item is open, and no payment was started (a pending payment
+    is the payment sweep's job). Re-running the file then processes it again instead
+    of skipping it as a duplicate, so the invoice is never silently stuck.
+    """
+    if row["status"] not in _IN_FLIGHT or not db.is_stale(row["updated_at"]):
+        return False
+    open_item = conn.execute(
+        "SELECT 1 FROM inbox WHERE vendor=? AND invoice_number=? AND status='open'", (key.vendor, key.invoice_number)
+    ).fetchone()
+    return open_item is None and db.payment_state(conn, key) is None
+
+
 def check(conn: sqlite3.Connection, key: InvoiceKey, inv: Invoice) -> Check:
     """Compare an extracted invoice with what the ledger already holds for its vendor and number.
 
@@ -112,7 +133,9 @@ def check(conn: sqlite3.Connection, key: InvoiceKey, inv: Invoice) -> Check:
     old, new = json.loads(row["core"]), core(inv)
     if inv.revision == row["revision"]:
         bad = conflicts(old, new)
-        return Conflict(bad) if bad else Duplicate(row["status"], row["source_path"])
+        if bad:
+            return Conflict(bad)
+        return New() if _interrupted(conn, key, row) else Duplicate(row["status"], row["source_path"])
     if inv.revision < row["revision"]:
         return Stale(row["revision"])
     inbox = conn.execute(
