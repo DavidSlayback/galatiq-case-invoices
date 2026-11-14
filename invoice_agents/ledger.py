@@ -9,14 +9,15 @@ and even in which optional fields they state (1011's PDF has no subtotal).
 import json
 import sqlite3
 from dataclasses import dataclass, field
-from datetime import timedelta
+from datetime import date, timedelta
 from decimal import Decimal
 from typing import Any
 
-from invoice_agents import db, identity
+from invoice_agents import db, fx, identity
 from invoice_agents.models import EventType, Finding, Invoice, InvoiceKey, Status
 
 CORE_FIELDS = ("vendor", "invoice_number", "revision", "invoice_date", "due_date", "total", "lines")
+PAYABLE_FIELDS = ("total", "lines")  # a copy without them cannot be paid, so it is not an original
 
 
 def core(inv: Invoice) -> dict[str, Any]:
@@ -141,12 +142,15 @@ def check(conn: sqlite3.Connection, key: InvoiceKey, inv: Invoice) -> Check:
         return New()
     old, new = json.loads(row["core"]), core(inv)
     if inv.revision == row["revision"]:
-        bad = conflicts(old, new)
+        # A stub on file (no total or no lines) is never the original of a full copy: anyone
+        # could otherwise send one first and have the vendor's real invoice skipped (D53).
+        bad = conflicts(old, new) or [k for k in PAYABLE_FIELDS if old.get(k) is None and new.get(k) is not None]
         if bad:
             return Conflict(bad)
         return New() if _interrupted(conn, key, row) else Duplicate(row["status"], row["source_path"])
     if inv.revision < row["revision"]:
-        return Stale(row["revision"])
+        # The newer revision was rejected: the older one may be the genuine invoice, so a person looks (D53).
+        return Conflict(["revision"]) if row["status"] == Status.REJECTED.value else Stale(row["revision"])
     inbox = conn.execute(
         # Payment items stay open: a revision must not hide money that may already have left.
         "SELECT id FROM inbox WHERE vendor=? AND invoice_number=? AND status='open'"
@@ -161,32 +165,79 @@ def check(conn: sqlite3.Connection, key: InvoiceKey, inv: Invoice) -> Check:
     )
 
 
-def split_findings(conn: sqlite3.Connection, key: InvoiceKey, inv: Invoice, limit: Decimal) -> list[Finding]:
-    """Same vendor, same invoice date, each under the limit but together over it: a split to dodge review."""
-    if inv.total is None or inv.invoice_date is None or inv.total >= limit:
-        return []
+SPLIT_WINDOW = timedelta(days=7)  # invoices this close together are judged as one purchase (D53)
+
+
+def _others(conn: sqlite3.Connection, key: InvoiceKey) -> list[tuple[str, dict[str, Any], str | None]]:
+    """The vendor's other invoices on file: number, core fingerprint, currency."""
     rows = conn.execute(
-        "SELECT invoice_number, core FROM invoices WHERE vendor=? AND invoice_number<>? AND core IS NOT NULL",
+        "SELECT invoice_number, core, currency FROM invoices WHERE vendor=? AND invoice_number<>? AND core IS NOT NULL",
         (key.vendor, key.invoice_number),
     ).fetchall()
-    day = inv.invoice_date.isoformat()
-    siblings = [
-        (r["invoice_number"], Decimal(c["total"]))
-        for r in rows
-        if (c := json.loads(r["core"]))["invoice_date"] == day
-        and c["total"] is not None
-        and Decimal(c["total"]) < limit
-    ]
-    combined = inv.total + sum((t for _, t in siblings), Decimal(0))
+    return [(r["invoice_number"], json.loads(r["core"]), r["currency"]) for r in rows]
+
+
+def _person_decided(conn: sqlite3.Connection, vendor: str, invoice_number: str) -> bool:
+    """A person has already decided this invoice, so it did not escape review."""
+    sql = "SELECT 1 FROM invoice_events WHERE vendor=? AND invoice_number=? AND event='human_decision'"
+    return conn.execute(sql, (vendor, invoice_number)).fetchone() is not None
+
+
+def split_findings(
+    conn: sqlite3.Connection, key: InvoiceKey, inv: Invoice, limit: Decimal, rates: dict[str, Decimal], as_of: date
+) -> list[Finding]:
+    """Same vendor, within a week, each under the limit but together over it (in USD): a split to dodge review.
+
+    An undated invoice counts as dated ``as_of`` and every undated sibling counts as inside
+    the window, so leaving the date off cannot dodge the check (D53). A sibling a person has
+    already decided is left out: the split rule catches spend that escaped review together.
+    """
+    usd = fx.to_usd(inv.total, inv.currency, rates)
+    if usd is None or usd >= limit:
+        return []
+    day = inv.invoice_date or as_of
+    siblings: list[tuple[str, Decimal]] = []
+    for number, c, currency in _others(conn, key):
+        other = fx.to_usd(Decimal(c["total"]), currency or "USD", rates) if c["total"] is not None else None
+        when = date.fromisoformat(c["invoice_date"]) if c["invoice_date"] else None
+        near = when is None or abs(when - day) <= SPLIT_WINDOW
+        if other is not None and other < limit and near and not _person_decided(conn, key.vendor, number):
+            siblings.append((number, other))
+    combined = usd + sum((t for _, t in siblings), Decimal(0))
     if not siblings or combined < limit:
         return []
-    msg = f"{len(siblings) + 1} invoices from {key.vendor} dated {day} total {combined}, each under {limit}"
+    msg = (
+        f"{len(siblings) + 1} invoices from {key.vendor} within {SPLIT_WINDOW.days} days of {day}"
+        f" total {combined} USD, each under {limit}"
+    )
     return [
         Finding(
             rule_id="SPLIT_INVOICE_SUSPECTED", severity="fraud", message=msg,
             evidence={"with": [n for n, _ in siblings], "combined": str(combined)},
         )
     ]  # fmt: skip
+
+
+def same_content(conn: sqlite3.Connection, key: InvoiceKey, inv: Invoice) -> list[Finding]:
+    """Another invoice from this vendor with the same lines and total under a different number: a resend (D53).
+
+    Duplicates are otherwise found by number, so a resend under ``INV-5010-A``, with no number,
+    or with any other variant would be paid twice. Dates count only when both copies state one.
+    """
+    mine = core(inv)
+    if mine["total"] is None or not mine["lines"]:
+        return []
+    same = [
+        number
+        for number, c, _ in _others(conn, key)
+        if c["total"] == mine["total"]
+        and c["lines"] == mine["lines"]
+        and (c["invoice_date"] is None or mine["invoice_date"] is None or c["invoice_date"] == mine["invoice_date"])
+    ]
+    if not same:
+        return []
+    msg = f"same lines and total as {', '.join(same)} from {key.vendor}: possibly the same invoice sent again"
+    return [Finding(rule_id="POSSIBLE_DUPLICATE", severity="fraud", message=msg, evidence={"with": same})]
 
 
 def already_paid(conn: sqlite3.Connection, vendor: str, invoice_number: str) -> Decimal:

@@ -219,9 +219,11 @@ async def validate(ctx: StepContext[State, Deps, Reconciled]) -> approval.Route:
     s, d, inv = ctx.state, ctx.deps, ctx.inputs.invoice
     assert s.key is not None
     s.findings += rules.validate(inv, d.conn, d.settings.as_of, s.doc.text if s.doc else "")
-    s.findings += ledger.split_findings(d.conn, s.key, inv, approval.AUTO_LIMIT)
+    rates = fx.rates(d.conn)
+    s.findings += ledger.split_findings(d.conn, s.key, inv, approval.AUTO_LIMIT, rates, d.settings.as_of)
+    s.findings += ledger.same_content(d.conn, s.key, inv)
     db.record_findings(d.conn, s.key, s.run_id, s.findings)
-    r = approval.route(inv, s.findings, fx.to_usd(inv.total, inv.currency, fx.rates(d.conn)), s.amount_due)
+    r = approval.route(inv, s.findings, fx.to_usd(inv.total, inv.currency, rates), s.amount_due)
     if isinstance(r, HumanReview) and r.reason == approval.REVISION_AFTER_PAYMENT:
         db.record(d.conn, s.key, EventType.REVISION_AFTER_PAYMENT, actor="ledger", run_id=s.run_id,
                   payload={"amount_due": str(s.amount_due)})  # fmt: skip

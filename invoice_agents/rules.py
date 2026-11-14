@@ -5,9 +5,12 @@ human, ``note`` is informational (D7, D10). The rule table is documented in
 docs/RULES.md.
 """
 
+import base64
+import contextlib
 import json
 import re
 import sqlite3
+import unicodedata
 from collections import defaultdict
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -22,6 +25,8 @@ from invoice_agents.reconcile import net_days
 NEAR_THRESHOLD_FROM = Decimal("9500")  # D27: 9,500 <= total < 10,000
 PRICE_TOLERANCE = Decimal("0.05")  # D6: >5% over catalog
 TERMS_TOLERANCE_DAYS = 1  # D26: vendors count terms inclusively
+CHARGES_SHARE = Decimal("0.20")  # D53: charges outside the lines above 20% of the goods...
+CHARGES_FLOOR = Decimal("100")  # ...and above 100 USD go to a reviewer
 
 # Addresses that cannot be a supplier's (seed list; a real system would use an address-verification service).
 SUSPICIOUS_ADDRESSES = ("1600 pennsylvania ave",)
@@ -146,6 +151,12 @@ def missing_fields(c: Ctx) -> list[Finding]:
         out.append(_f("MISSING_TOTAL", "hard", "total amount is missing"))
     if not inv.lines:
         out.append(_f("NO_LINE_ITEMS", "hard", "no line items"))
+    # D53: without a number the duplicate check has only the content to go on, and without a
+    # date the terms and split checks have nothing; a reviewer sees either before it is paid.
+    if not (inv.invoice_number or "").strip():
+        out.append(_f("MISSING_INVOICE_NUMBER", "soft", "invoice number is missing"))
+    if inv.invoice_date is None:
+        out.append(_f("MISSING_INVOICE_DATE", "soft", "invoice date is missing or unreadable"))
     if inv.total is not None and inv.total <= 0:  # B6: nothing to pay; a credit note is a different flow
         out.append(_f("NON_POSITIVE_TOTAL", "hard", f"total {inv.total} is not a payable amount"))
     out += [
@@ -190,6 +201,25 @@ def price_vs_catalog(c: Ctx) -> list[Finding]:
             msg = f"'{ln.item_raw}' at {usd} USD is below catalog {cat}"
             out.append(_f("DISCOUNT_APPLIED", "note", msg, item=ln.item_raw, price=str(usd), catalog=str(cat)))
     return out
+
+
+def charges_vs_lines(c: Ctx) -> list[Finding]:
+    """Tax, shipping and other charges outside the lines that are large next to the goods (D53).
+
+    Only line prices are checked against the catalog, so an overcharge moved into freight or
+    tax would otherwise pass. The samples' charges are at most 9% of their lines.
+    """
+    inv = c.invoice
+    amounts = [ln.amount if ln.amount is not None else (
+        ln.unit_price * ln.quantity if ln.unit_price is not None else None) for ln in inv.lines]  # fmt: skip
+    if inv.total is None or not amounts or None in amounts:
+        return []
+    goods = sum((a for a in amounts if a is not None), Decimal(0))
+    extra, extra_usd = inv.total - goods, c.usd(inv.total - goods)
+    if goods <= 0 or extra_usd is None or extra_usd <= CHARGES_FLOOR or extra <= goods * CHARGES_SHARE:
+        return []
+    msg = f"charges outside the lines ({extra} {inv.currency}) are {extra / goods:.0%} of the goods ({goods})"
+    return [_f("CHARGES_OUT_OF_PROPORTION", "soft", msg, extra=str(extra), goods=str(goods))]
 
 
 def near_threshold(c: Ctx) -> list[Finding]:
@@ -264,10 +294,37 @@ def vendor_checks(c: Ctx) -> list[Finding]:
 
 
 INJECTION = re.compile(
-    r"(ignore (all |any )?(previous|prior|above) (rules|instructions)|^\s*system\s*:|\bassistant\s*,"
-    r"|pre-?approved by|approve (and pay )?this invoice|without further (checks|review))",
+    r"((ignore|disregard|forget|override|bypass) (all |any |the |your )*(previous|prior|above|earlier|preceding|system)"
+    r" (rules|instructions|guidance|directions|polic(y|ies)|prompts?)|^ ?system ?:|\bassistant ?,"
+    r"|pre-?approved by|approve (and pay |& pay )?(this|the) invoice|without further (checks|review)"
+    r"|ignore[zr]? (toutes )?(les )?(instructions|r[eè]gles)|ignora (todas )?las instrucciones"
+    r"|ignoriere (alle )?(vorherigen )?anweisungen)",
     re.IGNORECASE | re.MULTILINE,
 )
+# D53: Cyrillic and Greek letters that look Latin, so "Ignore" spelt with a Cyrillic o still matches.
+CONFUSABLES = str.maketrans(
+    "аеорсухіјѕԁԝАВЕКМНОРСТХІЈЅοαεικνρτυχΟΑΕΙΚΝΡΤΥΧΒΜΖ", "aeopcyxijsdwABEKMHOPCTXIJSoaeikvptuxOAEIKNPTYXBMZ"
+)
+BASE64 = re.compile(r"[A-Za-z0-9+/]{16,}={0,2}")
+
+
+def injection_views(text: str) -> list[str]:
+    """The texts the injection pattern is run on (D53).
+
+    Compatibility forms, invisible format characters (zero-width spaces) and look-alike
+    letters are folded; spacing is collapsed within each line and, separately, across lines,
+    so "Approve" and "this invoice" on two lines still match. Base64 runs are decoded too.
+    """
+    t = "".join(ch for ch in unicodedata.normalize("NFKC", text) if unicodedata.category(ch) != "Cf")
+    t = t.translate(CONFUSABLES)
+    lines = "\n".join(re.sub(r"[^\S\n]+", " ", ln) for ln in t.splitlines())
+    views = [lines, re.sub(r"\s+", " ", t)]
+    for blob in BASE64.findall(t):
+        with contextlib.suppress(ValueError, UnicodeDecodeError):
+            decoded = base64.b64decode(blob + "=" * (-len(blob) % 4), validate=True).decode("utf-8")
+            if decoded.isprintable():
+                views.append(decoded)
+    return views
 
 
 def prompt_injection(c: Ctx) -> list[Finding]:
@@ -277,10 +334,26 @@ def prompt_injection(c: Ctx) -> list[Finding]:
     fields = (inv.vendor, inv.vendor_address, inv.notes, inv.payment_terms, inv.remit_to, inv.due_date_raw)
     lines = [x for ln in inv.lines for x in (ln.item_raw, ln.note)]
     text = "\n".join(x for x in (c.text, *fields, *lines) if x)  # one field per line keeps "^SYSTEM:" anchored
-    hits = sorted({m.group(0).strip() for m in INJECTION.finditer(text)})
+    hits = sorted({m.group(0).strip() for v in injection_views(text) for m in INJECTION.finditer(v)})
     if not hits:
         return []
     return [_f("PROMPT_INJECTION", "fraud", f"instructions addressed to an approver or AI: {hits}", phrases=hits)]
+
+
+# Anything else in a remit-to line that names an account, or says the account changed.
+OTHER_ACCOUNT = re.compile(
+    r"\b(ach|iban|swift|bic|aba|acct|account|routing|sort code|new|changed|updated|closed|moved|instead)\b|\d{5,}"
+)
+
+
+def remit_matches(remit: str, bank_ref: str) -> bool:
+    """The remit-to line names the bank reference on file, as a whole token, and no other account (D53).
+
+    A substring test let ``ACH-00019`` and "ACH-0001 closed; pay the new account" pass as ``ACH-0001``.
+    """
+    t, ref = identity.fold(remit), identity.fold(bank_ref)
+    m = re.search(rf"(?<![a-z0-9]){re.escape(ref)}(?![a-z0-9])", t)
+    return m is not None and OTHER_ACCOUNT.search(t[: m.start()] + " " + t[m.end() :]) is None
 
 
 def bank_details(c: Ctx) -> list[Finding]:
@@ -292,7 +365,7 @@ def bank_details(c: Ctx) -> list[Finding]:
     m = vendors.match(c.invoice.vendor, {k: v["name"] for k, v in c.ref.vendors.items()}, c.ref.aliases)  # type: ignore[misc]
     v = c.ref.vendors.get(identity.fold(m.registered_as)) if m.registered_as else None
     remit = c.invoice.remit_to
-    if not remit or v is None or not v.get("bank_ref") or str(v["bank_ref"]) in remit:
+    if not remit or v is None or not v.get("bank_ref") or remit_matches(remit, str(v["bank_ref"])):
         return []
     msg = f"remit-to details differ from the bank on file for {v['name']}: {remit}"
     return [_f("BANK_DETAILS_CHANGED", "fraud", msg, remit_to=remit, on_file=v["bank_ref"])]
@@ -318,6 +391,7 @@ RULES: list[Rule] = [
     missing_fields,
     unsupported_currency,
     price_vs_catalog,
+    charges_vs_lines,
     near_threshold,
     due_dates,
     vendor_checks,

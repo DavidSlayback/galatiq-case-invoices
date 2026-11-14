@@ -125,12 +125,22 @@ def sku(item: str) -> str | None:
     return next((s for s in SKUS if s.lower() == key), None)
 
 
+DASHES = re.compile("[\u2010-\u2015\u2212\ufe58\ufe63\uff0d]")  # Unicode hyphens and dashes
+
+
 def invoice_number(s: str | None) -> str | None:
-    """Canonical number: ``1002``, ``INV 1012`` and ``INV-1012`` all become ``INV-<digits>``."""
+    """Canonical number: ``1002``, ``INV 1012``, ``INV-1012``, ``No. 01012`` and ``INV—1012.`` all become ``INV-1012``.
+
+    Unicode dashes, a ``No.`` prefix, trailing punctuation and leading zeros are not part of
+    the number, so a resend cannot dodge the duplicate check with them (D53). Other suffixes
+    (``-A``, ``/1``) are kept: they can name a real, separate invoice, and the content check
+    (:func:`invoice_agents.ledger.same_content`) catches resends that use them.
+    """
     if not s or not s.strip():
         return None
-    m = re.fullmatch(r"(?:inv(?:oice)?)?[\s#:\-]*(\d+)", ocr_digits(s.strip()), re.IGNORECASE)
-    return f"INV-{m.group(1)}" if m else (s.strip() if re.search(r"\d", s) else None)
+    t = DASHES.sub("-", ocr_digits(s.strip())).rstrip(".,;:")
+    m = re.fullmatch(r"(?:inv(?:oice)?|no|nr|number)?[\s#:.\-]*(?:no\.?\s*)?(\d+)", t, re.IGNORECASE)
+    return f"INV-{int(m.group(1))}" if m else (t if re.search(r"\d", t) else None)
 
 
 def revision(s: str | None) -> int:
