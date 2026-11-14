@@ -168,19 +168,24 @@ def check(conn: sqlite3.Connection, key: InvoiceKey, inv: Invoice) -> Check:
 SPLIT_WINDOW = timedelta(days=7)  # invoices this close together are judged as one purchase (D53)
 
 
-def _others(conn: sqlite3.Connection, key: InvoiceKey) -> list[tuple[str, dict[str, Any], str | None]]:
-    """The vendor's other invoices on file: number, core fingerprint, currency."""
+def _others(conn: sqlite3.Connection, key: InvoiceKey) -> list[tuple[str, dict[str, Any], str | None, str]]:
+    """The vendor's other invoices on file: number, core fingerprint, currency, status."""
     rows = conn.execute(
-        "SELECT invoice_number, core, currency FROM invoices WHERE vendor=? AND invoice_number<>? AND core IS NOT NULL",
+        "SELECT invoice_number, core, currency, status FROM invoices"
+        " WHERE vendor=? AND invoice_number<>? AND core IS NOT NULL",
         (key.vendor, key.invoice_number),
     ).fetchall()
-    return [(r["invoice_number"], json.loads(r["core"]), r["currency"]) for r in rows]
+    return [(r["invoice_number"], json.loads(r["core"]), r["currency"], r["status"]) for r in rows]
 
 
-def _person_decided(conn: sqlite3.Connection, vendor: str, invoice_number: str) -> bool:
-    """A person has already decided this invoice, so it did not escape review."""
+# Statuses whose money moved, or may yet move, without anyone reviewing it.
+_UNREVIEWED = (Status.PAID.value, Status.RECEIVED.value, Status.EXTRACTED.value, Status.VALIDATED.value)
+
+
+def _escaped_review(conn: sqlite3.Connection, vendor: str, invoice_number: str, status: str) -> bool:
+    """Paid or in flight, and no person decided it: escalated, rejected or person-approved invoices were reviewed."""
     sql = "SELECT 1 FROM invoice_events WHERE vendor=? AND invoice_number=? AND event='human_decision'"
-    return conn.execute(sql, (vendor, invoice_number)).fetchone() is not None
+    return status in _UNREVIEWED and conn.execute(sql, (vendor, invoice_number)).fetchone() is None
 
 
 def split_findings(
@@ -189,19 +194,19 @@ def split_findings(
     """Same vendor, within a week, each under the limit but together over it (in USD): a split to dodge review.
 
     An undated invoice counts as dated ``as_of`` and every undated sibling counts as inside
-    the window, so leaving the date off cannot dodge the check (D53). A sibling a person has
-    already decided is left out: the split rule catches spend that escaped review together.
+    the window, so leaving the date off cannot dodge the check (D53). Only siblings that escaped
+    review count: one already with a person, rejected, or decided by a person is left out.
     """
     usd = fx.to_usd(inv.total, inv.currency, rates)
     if usd is None or usd >= limit:
         return []
     day = inv.invoice_date or as_of
     siblings: list[tuple[str, Decimal]] = []
-    for number, c, currency in _others(conn, key):
+    for number, c, currency, status in _others(conn, key):
         other = fx.to_usd(Decimal(c["total"]), currency or "USD", rates) if c["total"] is not None else None
         when = date.fromisoformat(c["invoice_date"]) if c["invoice_date"] else None
         near = when is None or abs(when - day) <= SPLIT_WINDOW
-        if other is not None and other < limit and near and not _person_decided(conn, key.vendor, number):
+        if other is not None and other < limit and near and _escaped_review(conn, key.vendor, number, status):
             siblings.append((number, other))
     combined = usd + sum((t for _, t in siblings), Decimal(0))
     if not siblings or combined < limit:
@@ -229,7 +234,7 @@ def same_content(conn: sqlite3.Connection, key: InvoiceKey, inv: Invoice) -> lis
         return []
     same = [
         number
-        for number, c, _ in _others(conn, key)
+        for number, c, _, _ in _others(conn, key)
         if c["total"] == mine["total"]
         and c["lines"] == mine["lines"]
         and (c["invoice_date"] is None or mine["invoice_date"] is None or c["invoice_date"] == mine["invoice_date"])

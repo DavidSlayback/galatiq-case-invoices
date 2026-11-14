@@ -141,14 +141,23 @@ def test_r34_a_sibling_a_person_decided_does_not_count(conn: sqlite3.Connection)
     assert _split(conn, invoice(invoice_number="INV-5045", total=Decimal(2000))) == set()
 
 
+@pytest.mark.parametrize("status", [Status.ESCALATED, Status.REJECTED])
+def test_r34_a_sibling_under_review_or_rejected_does_not_count(conn: sqlite3.Connection, status: Status):
+    """Sample 1006 sits a few days from the 2002/2003 split, and 2003 is already with a person."""
+    put(conn, "Summit Manufacturing Co.", "INV-5046", invoice(invoice_number="INV-5046", total=Decimal(9000)), status)
+    assert _split(conn, invoice(invoice_number="INV-5047", total=Decimal(2000))) == set()
+
+
 def test_r35_split_totals_compare_in_usd(conn: sqlite3.Connection):
     put(
         conn,
         "TechParts International",
         "INV-5050",
-        invoice(invoice_number="INV-5050", currency="EUR", total=Decimal(4860)),
+        invoice(invoice_number="INV-5050", currency="EUR", total=Decimal(4700)),
     )
-    eur = invoice(invoice_number="INV-5051", currency="EUR", total=Decimal(4860))  # 9,720 EUR is over 10,000 USD
+    eur = invoice(
+        invoice_number="INV-5051", currency="EUR", total=Decimal(4700)
+    )  # 9,400 EUR is 10,152 USD; either one alone in EUR stays under
     assert _split(conn, eur, "TechParts International") == {"SPLIT_INVOICE_SUSPECTED"}
 
 
