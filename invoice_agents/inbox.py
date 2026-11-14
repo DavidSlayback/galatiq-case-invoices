@@ -9,7 +9,7 @@ answered against that payment instead (D45).
 
 import json
 import sqlite3
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Any
 
@@ -37,6 +37,15 @@ class Item:
     flags: list[str]
     reasoning: list[str]
     created: str
+    vendor_changes: list[dict[str, str]] = field(default_factory=list[dict[str, str]])
+
+
+PAYMENT_ITEMS = ("overpayment", payment.UNCONFIRMED)  # answered against a payment, not the invoice
+
+
+def offered_changes(findings: list[Finding], vendor: str, reason: str) -> list[dict[str, str]]:
+    """The vendor-master changes an approval of this item may apply (D50, D52); none for payment items."""
+    return [] if reason in PAYMENT_ITEMS else vendors.master_changes(findings, vendor)
 
 
 def findings_for(conn: sqlite3.Connection, key: InvoiceKey) -> list[Finding]:
@@ -85,6 +94,7 @@ def list_open(conn: sqlite3.Connection) -> list[Item]:
                 amount_due=r["amount_due"], risk=risk,
                 flags=sorted({f.rule_id for f in findings if f.severity != "note"}),
                 reasoning=_reasoning(conn, key, r["reason"]), created=r["created_ts"],
+                vendor_changes=offered_changes(findings, key.vendor, r["reason"]),
             )
         )  # fmt: skip
     return out
@@ -157,6 +167,8 @@ def resolve(
     key = InvoiceKey(r["vendor"], r["invoice_number"], r["revision"])
     run_id = new_run_id()
     decision = {"kind": "approve" if approve else "reject", "note": note, "inbox_id": r["id"], "reason": r["reason"]}
+    if update_vendor and r["reason"] in PAYMENT_ITEMS:
+        raise InboxError("a payment item changes no vendor record; decide it without updating the vendor")
     if r["reason"] == "overpayment":  # money already left twice: the decision records the recovery, nothing is paid
         db.resolve_inbox(conn, r["id"], key, reviewer=reviewer, run_id=run_id, decision=decision, status=Status.PAID)
         return {"status": "recovery_recorded", "amount": r["amount_due"]}
@@ -174,14 +186,16 @@ def resolve(
         raise InboxError(f"cannot approve: hard findings {', '.join(hard)}")
     if approve and (inv is None or inv["total"] is None):
         raise InboxError("cannot approve: nothing usable was extracted; reject it or reprocess the file")
-    changes = vendors.master_changes(findings, key.vendor) if update_vendor else []
+    changes = offered_changes(findings, key.vendor, r["reason"]) if update_vendor else []
     if update_vendor and not approve:
         raise InboxError("the vendor record is updated only with an approval")
     if update_vendor and not changes:
-        raise InboxError("this invoice proposes no vendor-record change (only a rename or new bank details do)")
-    db.resolve_inbox(conn, r["id"], key, reviewer=reviewer, run_id=run_id, decision=decision)
-    for change in changes:  # verified out of band by the reviewer; the next invoice matches without a flag
-        db.update_vendor_master(conn, key, change, actor=reviewer, run_id=run_id, note=note)
+        raise InboxError(
+            "this invoice offers no vendor-record change: only a rename or new bank details do,"
+            " and never alongside another fraud signal"
+        )
+    # Verified out of band by the reviewer; applied with the decision, so the next invoice matches without a flag.
+    db.resolve_inbox(conn, r["id"], key, reviewer=reviewer, run_id=run_id, decision=decision, vendor_changes=changes)
     total = Decimal(inv["total"]) if inv and inv["total"] is not None else None
     currency = (inv["currency"] if inv else None) or "USD"
     done = settle.settle(

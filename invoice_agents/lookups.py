@@ -6,6 +6,7 @@ about an item? These functions answer from the ledger and the reference tables.
 They never write, so a prompt-injected agent gains nothing by calling them.
 """
 
+import re
 import sqlite3
 from decimal import Decimal
 from typing import Any
@@ -13,6 +14,15 @@ from typing import Any
 from invoice_agents.models import InvoiceKey
 
 RECENT = 5  # invoices listed in a vendor history; enough to show a pattern, small enough to read
+# Earlier invoices' numbers are whatever their senders wrote (normalize keeps any string with a
+# digit), so anything that is not a plain identifier is withheld from the reviewers (D52).
+PLAIN_NUMBER = re.compile(r"[A-Za-z0-9][A-Za-z0-9._/#-]{0,31}")
+WITHHELD = "(unusual invoice number withheld)"
+
+
+def _number(n: str) -> str:
+    """An earlier invoice's number as the reviewers see it: plain identifiers only."""
+    return n if PLAIN_NUMBER.fullmatch(n) else WITHHELD
 
 
 def vendor_history(conn: sqlite3.Connection, key: InvoiceKey) -> dict[str, Any]:
@@ -53,7 +63,7 @@ def vendor_history(conn: sqlite3.Connection, key: InvoiceKey) -> dict[str, Any]:
         ),
         "invoices_on_file": by_status,
         "total_paid": {c: str(a) for c, a in paid.items()},
-        "recent": [dict(r) for r in recent],
+        "recent": [{**dict(r), "invoice_number": _number(r["invoice_number"])} for r in recent],
         "open_review_items": open_items,
     }
 

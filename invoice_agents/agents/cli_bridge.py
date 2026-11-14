@@ -152,15 +152,19 @@ def reply_schema(answer: dict[str, Any], tool_names: list[str]) -> dict[str, Any
     return {"type": "object", "properties": {"tool_call": call, "answer": answer}, "additionalProperties": False}
 
 
-def unwrap(payload: dict[str, Any], tool_names: set[str], output_tool: str) -> tuple[str, dict[str, Any]]:
+def unwrap(payload: dict[str, Any], tool_names: set[str], output_tool: str) -> tuple[str, dict[str, Any] | str]:
     """Which tool a reply calls: one of the agent's tools, or the output tool with the answer.
 
     A reply that wraps nothing is taken as the answer itself (models without a schema
-    flag sometimes drop the wrapper); PydanticAI validates it either way.
+    flag sometimes drop the wrapper); PydanticAI validates it either way. Tool arguments
+    that are not an object (a JSON-encoded string, a list) are passed on as JSON text, so a
+    malformed call becomes a validation retry for the model instead of a crash (D52).
     """
     call = payload.get("tool_call")
     if tool_names and isinstance(call, dict) and call.get("name") in tool_names:  # pyright: ignore[reportUnknownMemberType]
-        return str(call["name"]), dict(call.get("arguments") or {})  # pyright: ignore[reportUnknownArgumentType]
+        raw = call.get("arguments")  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+        args = raw if isinstance(raw, dict | str) else ({} if raw is None else json.dumps(raw))
+        return str(call["name"]), args  # pyright: ignore[reportUnknownArgumentType]
     answer = payload.get("answer")
     if tool_names and isinstance(answer, dict):
         return output_tool, answer  # pyright: ignore[reportUnknownVariableType]
