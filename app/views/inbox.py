@@ -5,11 +5,11 @@ import io
 
 import streamlit as st
 
-from app.common import chip, conn, settings
+from app.common import chip, conn, md, settings
 from invoice_agents import inbox
 
+CHANGE_LABEL = {"confirmed_name": "add confirmed name", "bank_ref": "replace bank details with"}
 # (approve label, reject label, help) by inbox reason: approving a payment item sends nothing new.
-LEARNABLE = {"VENDOR_RENAMED", "BANK_DETAILS_CHANGED"}
 DEFAULT_BUTTONS = ("Approve and pay", "Reject", "")
 BUTTONS = {
     "payment_unconfirmed": (
@@ -42,7 +42,7 @@ for it in items:
     label = chip(it.label.upper(), "red") + " " if it.label else ""
     amount = f"{it.amount_due} due (revision delta)" if it.amount_due else f"{it.total or '-'} {it.currency or ''}"
     with st.container(border=True):
-        st.markdown(f"### {label}{it.key.invoice_number} · {it.key.vendor}")
+        st.markdown(f"### {label}{md(it.key.invoice_number)} · {md(it.key.vendor)}")
         cols = st.columns(3)
         cols[0].metric("Amount", amount)
         # Plain text, not a metric: reasons like "fraud signals: PROMPT_INJECTION" are too long for one.
@@ -51,7 +51,7 @@ for it in items:
         if it.flags:
             st.markdown("**Flags:** " + "  ".join(chip(f, "orange") for f in it.flags))
         if it.reasoning:
-            st.markdown("**Agents' reasoning:** " + " ".join(it.reasoning))
+            st.markdown("**Agents' reasoning:** " + md(" ".join(it.reasoning)))
         with st.form(f"decide-{it.id}"):
             note = st.text_input(
                 "Note (required)", key=f"note-{it.id}", placeholder="e.g. Confirmed the rename with FastShip by phone"
@@ -60,13 +60,15 @@ for it in items:
             if help_text:
                 st.caption(help_text)
             learn = False
-            if LEARNABLE & set(it.flags):  # D50: only a rename or new bank details can be confirmed
+            if it.vendor_changes:  # D50, D52: a rename or new bank details, never beside another fraud signal
                 learn = st.checkbox(
                     "I verified this with the vendor: also update the vendor record",
                     key=f"learn-{it.id}",
-                    help="Adds the new name (or bank details) to the registry, so the vendor's next invoice is not"
-                    " flagged for it again. Logged with your note. Only applies when you approve.",
+                    help="Applies every change listed below, so the vendor's next invoice is not flagged for it"
+                    " again. Logged with your note. Only applies when you approve.",
                 )
+                for ch in it.vendor_changes:
+                    st.caption(f"{md(ch['vendor'])}: {CHANGE_LABEL[ch['field']]} → {md(ch['value'])}")
             a, r = st.columns(2)
             approve = a.form_submit_button(yes, type="primary")
             reject = r.form_submit_button(no)

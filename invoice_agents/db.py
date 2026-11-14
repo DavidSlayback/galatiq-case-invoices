@@ -10,6 +10,7 @@ aside). Triggers make the event table append-only.
 import json
 import sqlite3
 import unicodedata
+from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
@@ -430,12 +431,19 @@ def resolve_inbox(
     run_id: str,
     decision: dict[str, Any],
     status: Status | None = None,
+    vendor_changes: Sequence[dict[str, str]] = (),
 ) -> None:
     """Record a person's decision and close the inbox item (and optionally set the status), in one transaction.
+
+    ``vendor_changes`` are vendor-master changes the person verified (D50). They are applied in
+    the same transaction and recorded before the decision, so the decision stays the invoice's
+    last event and crash recovery still finds it (D46, D52).
 
     Does not check that the item is still open; :func:`invoice_agents.inbox.resolve` does.
     """
     with conn:
+        for change in vendor_changes:
+            _apply_vendor_change(conn, key, change, actor=reviewer, run_id=run_id, note=str(decision["note"]))
         _record(conn, key, EventType.HUMAN_DECISION, reviewer, run_id, decision, status, {})
         conn.execute(
             "UPDATE inbox SET status='resolved', resolved_ts=?, note=? WHERE id=?", (now(), decision["note"], inbox_id)
@@ -462,32 +470,29 @@ def pending_payment(conn: sqlite3.Connection, key: InvoiceKey) -> tuple[Decimal,
     return None if row is None else (Decimal(row[0]), int(row[1]))
 
 
-def update_vendor_master(
+def _apply_vendor_change(
     conn: sqlite3.Connection, key: InvoiceKey, change: dict[str, str], *, actor: str, run_id: str, note: str
 ) -> None:
-    """Apply one vendor-master change a person verified, and record it, in one transaction (D50).
+    """Apply one vendor-master change a person verified, and record it (D50); the caller owns the transaction.
 
     ``change`` is ``{"vendor": registered name, "field": "confirmed_name" | "bank_ref", "value": ...}``.
     A confirmed name is added to the vendor's confirmed names; a bank reference replaces the one
     on file. The event is recorded against the invoice that prompted the change.
     """
-    with conn:
-        row = conn.execute(
-            "SELECT confirmed_names_json, bank_ref FROM vendors WHERE name=?", (change["vendor"],)
-        ).fetchone()
-        if row is None:
-            raise ValueError(f"no registered vendor {change['vendor']!r}")
-        before: object
-        if change["field"] == "confirmed_name":
-            names = json.loads(row["confirmed_names_json"])
-            before = list(names)
-            if change["value"] not in names:
-                names.append(change["value"])
-            conn.execute(
-                "UPDATE vendors SET confirmed_names_json=? WHERE name=?", (json.dumps(names), change["vendor"])
-            )
-        else:
-            before = row["bank_ref"]
-            conn.execute("UPDATE vendors SET bank_ref=? WHERE name=?", (change["value"], change["vendor"]))
-        payload = {**change, "before": before, "note": note}
-        _record(conn, key, EventType.VENDOR_MASTER_UPDATED, actor, run_id, payload, None, {})
+    row = conn.execute(
+        "SELECT confirmed_names_json, bank_ref FROM vendors WHERE name=?", (change["vendor"],)
+    ).fetchone()
+    if row is None:
+        raise ValueError(f"no registered vendor {change['vendor']!r}")
+    before: object
+    if change["field"] == "confirmed_name":
+        names = json.loads(row["confirmed_names_json"])
+        before = list(names)
+        if change["value"] not in names:
+            names.append(change["value"])
+        conn.execute("UPDATE vendors SET confirmed_names_json=? WHERE name=?", (json.dumps(names), change["vendor"]))
+    else:
+        before = row["bank_ref"]
+        conn.execute("UPDATE vendors SET bank_ref=? WHERE name=?", (change["value"], change["vendor"]))
+    payload = {**change, "before": before, "note": note}
+    _record(conn, key, EventType.VENDOR_MASTER_UPDATED, actor, run_id, payload, None, {})

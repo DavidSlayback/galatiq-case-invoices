@@ -1,6 +1,7 @@
 """Shared pieces for the Streamlit pages: settings, database, and rendering helpers."""
 
 import json
+import re
 import sqlite3
 import sys
 from pathlib import Path
@@ -44,6 +45,20 @@ def conn(s: Settings) -> sqlite3.Connection:
     return open_db(s.db_path)
 
 
+MD_SPECIAL = re.compile(r"([\\`*_{}\[\]()#!|~<>$:&])")
+LIST_MARKER = re.compile(r"(?m)^(\s*)([-+]|\d+\.)")  # only special at the start of a line
+
+
+def md(text: object) -> str:
+    """Untrusted text (invoice fields, model output) made literal for ``st.markdown`` (D52).
+
+    Markdown control characters are backslash-escaped, so an invoice cannot plant a link,
+    a remote image, LaTeX (``$...$``), a colour directive or a bare autolink in a trusted panel.
+    """
+    out = MD_SPECIAL.sub(r"\\\1", str(text))
+    return LIST_MARKER.sub(lambda m: m.group(1) + "\\" + m.group(2), out)
+
+
 def chip(text: str, colour: str) -> str:
     """Inline coloured label using Streamlit's colour markdown."""
     return f":{colour}-badge[{text}]"
@@ -67,7 +82,9 @@ def findings_table(findings: list[Finding] | list[dict[str, Any]]) -> None:
 def outcome_card(o: Outcome) -> None:
     """Decision summary: status, who decided, and why."""
     colour = STATUS_COLOUR.get(o.status.value, "gray")
-    st.markdown(f"## {chip(o.status.value.replace('_', ' ').upper(), colour)}  {o.key.invoice_number} · {o.key.vendor}")
+    st.markdown(
+        f"## {chip(o.status.value.replace('_', ' ').upper(), colour)}  {md(o.key.invoice_number)} · {md(o.key.vendor)}"
+    )
     inv = o.invoice
     cols = st.columns(4)
     cols[0].metric("Total", f"{inv.total} {inv.currency}" if inv and inv.total is not None else "-")
@@ -77,7 +94,7 @@ def outcome_card(o: Outcome) -> None:
     if o.decision and o.decision.reasons:
         label = f" ({o.decision.label})" if o.decision.label else ""
         head, *rest = o.decision.reasons
-        st.info(f"**Why{label}:** {head.replace('_', ' ')}" + "".join(f"\n\n{x}" for x in rest))
+        st.info(f"**Why{md(label)}:** {md(head.replace('_', ' '))}" + "".join(f"\n\n{md(x)}" for x in rest))
 
 
 def trace(s: Settings, run_id: str) -> list[dict[str, Any]]:
@@ -99,6 +116,6 @@ def conversation(lines: list[dict[str, Any]]) -> None:
     for turn in thread.turns(lines):
         name, avatar = SPEAKERS[turn.speaker]
         with st.chat_message(turn.speaker, avatar=avatar):
-            st.markdown(f"**{name}** · {turn.text}")
+            st.markdown(f"**{name}** · {md(turn.text)}")
             for d in turn.details:
-                st.markdown(f"- {d}")
+                st.markdown(f"- {md(d)}")

@@ -17,7 +17,7 @@ def run_turns(conn: sqlite3.Connection, offline: Settings, name: str) -> list[th
 def test_a_reviewed_invoice_reads_as_a_conversation(conn: sqlite3.Connection, offline: Settings):
     ts = run_turns(conn, offline, "invoice_1010.txt")
     assert [t.speaker for t in ts] == ["extractor", "code", "code", "code", "vp", "critic"]
-    assert "propose to **approve**" in ts[4].text and "Cites PRICE_OVER_CATALOG" in ts[4].text
+    assert "propose to APPROVE" in ts[4].text and "Cites PRICE_OVER_CATALOG" in ts[4].text
     assert any("Looked up WidgetA in the catalog: 250.00 each, 15 in stock" in d for d in ts[4].details)
     assert any("Looked up the vendor's history: Registered vendor" in d for d in ts[4].details)
     assert ts[5].text == "I agree."

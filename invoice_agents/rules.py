@@ -284,8 +284,13 @@ def prompt_injection(c: Ctx) -> list[Finding]:
 
 
 def bank_details(c: Ctx) -> list[Finding]:
-    """Remittance details that do not match the registry's bank reference for a known vendor."""
-    v = c.ref.vendors.get(identity.fold(c.invoice.vendor))
+    """Remittance details that do not match the registry's bank reference for a known vendor.
+
+    The vendor is resolved the way :func:`vendor_checks` resolves it, so an alias or a
+    look-alike name is compared with the bank of the vendor it names (D52).
+    """
+    m = vendors.match(c.invoice.vendor, {k: v["name"] for k, v in c.ref.vendors.items()}, c.ref.aliases)  # type: ignore[misc]
+    v = c.ref.vendors.get(identity.fold(m.registered_as)) if m.registered_as else None
     remit = c.invoice.remit_to
     if not remit or v is None or not v.get("bank_ref") or str(v["bank_ref"]) in remit:
         return []

@@ -36,12 +36,16 @@ class Turn:
 
 def _lookup(call: dict[str, Any]) -> str:
     """One tool call in plain words, with the part of its result that mattered."""
-    r = call.get("result") or {}
+    raw = call.get("args")
+    args: dict[str, Any] = raw if isinstance(raw, dict) else {}
+    r = call.get("result")
+    if not isinstance(r, dict):  # the call failed validation and the model was asked to retry
+        return f"Called {call['tool']}({args or raw}): the call failed; the agent was asked to retry."
     if call["tool"] == "vendor_history":
         paid = ", ".join(f"{a} {c}" for c, a in (r.get("total_paid") or {}).items()) or "nothing yet"
         return f"Looked up the vendor's history: {r.get('note', 'no result')}; paid so far: {paid}."
     if call["tool"] == "catalog_item":
-        sku = call["args"].get("sku", "?")
+        sku = args.get("sku", "?")
         if not r.get("in_catalog", True):
             return f"Looked up {sku} in the catalog: not in the catalog."
         return f"Looked up {sku} in the catalog: {r.get('unit_price')} each, {r.get('stock')} in stock."
@@ -78,7 +82,7 @@ def turns(trace: list[dict[str, Any]]) -> list[Turn]:
         elif node == "vp_propose":
             p = t.get("proposal") or {}
             cites = f" Cites {', '.join(p['cited_rule_ids'])}." if p.get("cited_rule_ids") else ""
-            text = f"I propose to **{p.get('decision', '?')}**.{cites}"
+            text = f"I propose to {str(p.get('decision', '?')).upper()}.{cites}"  # plain text: the view escapes it
             out.append(Turn("vp", text, [*map(_lookup, t.get("tools") or []), *(p.get("reasons") or [])]))
         elif node == "critique":
             v = t.get("verdict") or {}

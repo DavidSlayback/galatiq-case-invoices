@@ -69,9 +69,13 @@ def master_changes(findings: list[Finding], vendor: str) -> list[dict[str, str]]
     """Vendor-master changes a person can confirm from an invoice's findings (D50).
 
     A renamed vendor (VENDOR_RENAMED) can have its new name confirmed; new remittance
-    details (BANK_DETAILS_CHANGED) can replace the bank reference on file. Look-alike
-    names are never offered: confirming one would let an impostor in.
+    details (BANK_DETAILS_CHANGED) can replace the bank reference on file. Nothing is
+    offered when any other fraud signal is present (a look-alike name, injected
+    instructions, an implausible address, a high risk score, a conflicting copy):
+    confirming such an invoice would hand an impostor the vendor's record (D52).
     """
+    if any(f.severity == "fraud" and f.rule_id != "BANK_DETAILS_CHANGED" for f in findings):
+        return []
     out: list[dict[str, str]] = []
     for f in findings:
         if f.rule_id == "VENDOR_RENAMED":
