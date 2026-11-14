@@ -38,7 +38,7 @@
   "shipping": null,
   "total": "15225.00",
   "payment_terms": "Net 60",
-  "notes": "Tax rate stated as 0.05 (5%).",
+  "notes": "Document states tax_rate 0.05 (5%). Source document is JSON-formatted text.",
   "remit_to": null,
   "provenance": {
     "vendor": "llm",

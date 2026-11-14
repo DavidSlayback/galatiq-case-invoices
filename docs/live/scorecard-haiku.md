@@ -35,34 +35,34 @@ Expectations: [eval/expected_outcomes.yaml](../eval/expected_outcomes.yaml).
 
 ## Live model usage and extraction differences from the goldens
 
-Total: 50 model calls, 58,189 tokens, 5.3 minutes.
+Total: 52 model calls, 48,040 tokens, 5.3 minutes.
 
 | File | Calls | Tokens | Seconds | Extraction differences |
 |---|---|---|---|---|
-| invoice_1001.txt | 4 | 4,798 | 28 | none |
-| invoice_1002.txt | 1 | 885 | 4 | none |
-| invoice_1003.txt | 1 | 627 | 4 | none |
-| invoice_1004.json | 1 | 930 | 5 | none |
-| invoice_1004_revised.json | 1 | 1,010 | 5 | none |
-| invoice_1005.json | 1 | 1,006 | 6 | none |
-| invoice_1006.csv | 1 | 769 | 4 | none |
-| invoice_1007.csv | 3 | 3,498 | 22 | none |
-| invoice_1008.txt | 3 | 3,157 | 16 | none |
-| invoice_1009.json | 3 | 3,259 | 19 | none |
-| invoice_1010.txt | 11 | 19,634 | 107 | none |
-| invoice_1011.pdf | 1 | 558 | 4 | none |
-| invoice_1011.txt | 1 | 594 | 4 | none |
-| invoice_1012.pdf | 1 | 1,181 | 6 | none |
-| invoice_1012.txt | 1 | 1,104 | 5 | none |
-| invoice_1013.json | 3 | 4,275 | 19 | none |
-| invoice_1013.pdf | 3 | 4,371 | 18 | none |
-| invoice_1014.xml | 1 | 669 | 4 | none |
-| invoice_1015.csv | 1 | 711 | 4 | none |
-| invoice_1016.json | 1 | 890 | 5 | none |
-| invoice_1011_scan.pdf | 1 | 848 | 8 | none |
-| invoice_2001_injection.txt | 1 | 603 | 4 | none |
-| invoice_2002_split_a.txt | 1 | 495 | 3 | none |
-| invoice_2003_split_b.txt | 1 | 683 | 3 | none |
-| invoice_2004_lookalike.txt | 1 | 258 | 3 | none |
-| invoice_2005_bank_change.txt | 1 | 847 | 5 | none |
-| invoice_2006_control.txt | 1 | 529 | 3 | none |
+| invoice_1001.txt | 11 | 9,244 | 72 | none |
+| invoice_1002.txt | 1 | 658 | 5 | none |
+| invoice_1003.txt | 1 | 627 | 5 | none |
+| invoice_1004.json | 1 | 995 | 6 | none |
+| invoice_1004_revised.json | 1 | 970 | 5 | none |
+| invoice_1005.json | 1 | 949 | 5 | none |
+| invoice_1006.csv | 1 | 341 | 4 | none |
+| invoice_1007.csv | 3 | 2,805 | 17 | none |
+| invoice_1008.txt | 3 | 3,178 | 18 | none |
+| invoice_1009.json | 3 | 3,019 | 18 | none |
+| invoice_1010.txt | 6 | 6,283 | 51 | none |
+| invoice_1011.pdf | 1 | 516 | 4 | none |
+| invoice_1011.txt | 1 | 373 | 3 | none |
+| invoice_1012.pdf | 1 | 1,210 | 7 | none |
+| invoice_1012.txt | 1 | 1,222 | 7 | none |
+| invoice_1013.json | 3 | 4,656 | 24 | none |
+| invoice_1013.pdf | 3 | 4,042 | 19 | none |
+| invoice_1014.xml | 1 | 998 | 6 | none |
+| invoice_1015.csv | 1 | 853 | 5 | none |
+| invoice_1016.json | 1 | 899 | 5 | none |
+| invoice_1011_scan.pdf | 1 | 364 | 7 | none |
+| invoice_2001_injection.txt | 1 | 747 | 6 | none |
+| invoice_2002_split_a.txt | 1 | 570 | 4 | none |
+| invoice_2003_split_b.txt | 1 | 294 | 3 | none |
+| invoice_2004_lookalike.txt | 1 | 692 | 5 | none |
+| invoice_2005_bank_change.txt | 1 | 764 | 5 | none |
+| invoice_2006_control.txt | 1 | 771 | 5 | none |

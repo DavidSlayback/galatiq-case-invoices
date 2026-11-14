@@ -5,11 +5,11 @@ Acme loses **$2M a year** processing invoices by hand: a 30% error rate and a 5-
 | | Today (brief) | This system (measured on the 27 test invoices) |
 |---|---|---|
 | Planted problems caught | 70% (30% error rate) | **100%**, across 27/27 expected outcomes |
-| Time per invoice | 5 days | **~24 s** automated (live Grok, 2026-11-13); escalations wait for a person |
+| Time per invoice | 5 days | **~24 s** automated (live Grok, 2026-11-14); escalations wait for a person |
 | Handled with no person | 0% | **78%**, on a test set deliberately full of problems |
 | Model cost per invoice | — | **~4.6¢** (Grok 4.7 at published API prices) |
 
-The case brief is in [docs/BRIEF.md](docs/BRIEF.md). A 3-minute narrated demo is in [docs/demo/demo.mp4](docs/demo/demo.mp4) (synthetic voice; every screen is real command output). The presentation is a one-page walkthrough of the architecture, decisions and results: [Acme Invoice Agents explainer](https://claude.ai/artifact/Uk4Fdc3Wff3zQPaVSpUghN) (updated 2026-11-13 for commit df1beec).
+The case brief is in [docs/BRIEF.md](docs/BRIEF.md). A 3½-minute narrated demo is in [docs/demo/demo.mp4](docs/demo/demo.mp4) (synthetic voice; every screen is real command output). The presentation is a one-page walkthrough of the architecture, decisions and results: [Acme Invoice Agents explainer](https://claude.ai/artifact/Uk4Fdc3Wff3zQPaVSpUghN) (updated 2026-11-13 for commit df1beec).
 
 ## Quickstart
 
@@ -92,8 +92,8 @@ The full state graph is generated from the code: [docs/graph.mmd](docs/graph.mmd
 **Live** ([docs/live/README.md](docs/live/README.md)):
 - **Grok 4.7 via Cursor:** 27/27, and the core extracted fields (vendor, number, dates, lines, total) match the goldens on all 27 files.
 - **Claude Haiku:** 27/27, with the same core-field match on all 27.
-- Both read the scanned PDF from its image and treated the prompt-injection text as data. Both called the review tools on live runs: Haiku 7 times, Grok twice.
-- These runs are from 2026-11-13, on the current code.
+- Both read the scanned PDF from its image and treated the prompt-injection text as data. Both called the review tools on live runs: Haiku 9 times, Grok twice.
+- These runs are from 2026-11-14, on the current code (after D52 and D53).
 
 Traps in the data, including several the brief's table doesn't mention:
 

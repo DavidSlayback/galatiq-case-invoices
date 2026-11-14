@@ -30,7 +30,7 @@
   "shipping": null,
   "total": "-250.00",
   "payment_terms": null,
-  "notes": "Vendor name and address are blank in the source. Payment terms and due date are not stated. Tax rate is 0.0 and tax amount is 0.00 as written. The document states subtotal 1000.00 and total -250.00; these are kept as written. Line 1 quantity is -5 as written. The line items (WidgetA -5 x 250.00; WidgetB 2 x 500.00) do not reconcile with the stated subtotal of 1000.00, and the stated total is negative. All values are copied unchanged and flagged for review.",
+  "notes": "Vendor name is blank in the document (stated as \"\"). Document states tax rate 0.0. Stated subtotal 1000.00 and total -250.00 are kept as written. They do not reconcile with the line items as written: WidgetA quantity -5 at 250.00 and WidgetB quantity 2 at 500.00 (line sum -250.00 vs stated subtotal 1000.00). The document has no separate line amounts. Document is provided as JSON; no revision marker or remittance details are stated.",
   "remit_to": null,
   "provenance": {
     "vendor": "missing",

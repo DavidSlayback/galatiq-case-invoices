@@ -38,7 +38,7 @@
   "shipping": null,
   "total": "9975.00",
   "payment_terms": "Net 30",
-  "notes": "Ref PO-20260115. Deliver to warehouse dock B. Contact Jim at ext 4421 with questions. Tax label reads \"TAX (5%)\". Formerly FastShip Ltd.",
+  "notes": "Ref PO-20260115. Deliver to warehouse dock B. Contact Jim at ext 4421 with questions. Document also lists \"TO: ACME Corp, Attn: Accounts Payble\" and \"TAX (5%)\" label as written. Formerly FastShip Ltd.",
   "remit_to": null,
   "provenance": {
     "vendor": "llm",

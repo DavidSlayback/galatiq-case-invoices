@@ -14,7 +14,7 @@
       "quantity": "12",
       "unit_price": "400.00",
       "amount": null,
-      "note": "Quantity written as 'x12' in document"
+      "note": "Document writes the quantity as \"x12\"; the \"x\" is a multiplication marker and is not copied into the quantity field."
     },
     {
       "item_raw": "MegaSprocket",
@@ -22,7 +22,7 @@
       "quantity": "6",
       "unit_price": "850.00",
       "amount": null,
-      "note": "Quantity written as 'x6' in document"
+      "note": "Document writes the quantity as \"x6\"; the \"x\" is a multiplication marker and is not copied into the quantity field."
     }
   ],
   "subtotal": null,
@@ -30,7 +30,7 @@
   "shipping": null,
   "total": "9900.00",
   "payment_terms": null,
-  "notes": "Email from billing@noproduct.biz, subject \"Invoice Attached - Please Process\". Body text: \"Please process at your earliest convenience.\" Signed Accounts Receivable, NoProd Industries. Quantities were written as x12 and x6; recorded as 12 and 6 in quantity with the original form noted per line.",
+  "notes": "Email from billing@noproduct.biz to accounts@acmecorp.com, subject \"Invoice Attached - Please Process\". Body contains the sentence \"Please process at your earliest convenience.\" (a request from the sender, not an instruction followed). Signed Accounts Receivable, NoProd Industries. The stated total $9,900.00 does not match the listed lines (12 x $400.00 + 6 x $850.00 = $10,900.00); reported as written.",
   "remit_to": null,
   "provenance": {
     "vendor": "llm",
