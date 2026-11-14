@@ -35,3 +35,13 @@ David asked for three review passes after the refactor: concision and reuse, rea
 - **Behaviour fixes found along the way (D46):** a re-run resumes an invoice a crash left mid-run (30-minute bound derived from the agent timeouts). A recorded human decision is never re-judged; a sweep returns an unsettled one to the inbox. Regressions R17–R21, each mutation-checked.
 - **Performance (D47):** three indexes; inbox listing on a 20k-invoice ledger went from 321 s to 0.25 s with byte-identical output.
 - **Gate on a fresh clone:** 332 tests; offline eval 27/27.
+
+## Adversarial round (2026-11-13)
+
+David asked for an adversarial pass after the D50/D51 work. Two fresh-context agents ran in parallel: a code review of D48–D51 and a red team that could only send invoice files (24 run live on Haiku, about 45 code-only). Every finding was reproduced before it was fixed, and each fix has a regression test that fails when its guard is removed.
+
+- **D52 (PR #39), 8 code-review findings.** Three of them could move money: a look-alike invoice could rewrite the real vendor's bank details, an alias's remit-to was never compared, and an earlier invoice's text reached later reviews through `vendor_history`. Also fixed: a vendor update that broke crash recovery, a tool-argument crash, raw Markdown in the dashboard, and two UI gaps. Regressions R22–R29.
+- **D53 (PR #40), 10 red-team findings.** In the run, each one paid, double-paid or silently skipped money: freight overcharges, duplicate-number variants, resends with no number, undated, multi-day and EUR splits, a remit-to superstring, homoglyph injection, and stub or rejected-revision blocking. Regressions R30–R39. Re-running the red team's code-only cases on the fixed code sends every attack to the VP or a person.
+- **Gate:** `scripts/check-all` passes with 391 tests; the offline eval scores 27/27.
+- **Not re-done:** the live 27/27 re-runs, the demo video, the screenshots and the explainer Artifact all still show the pre-D52 code. No sample outcome changed.
+- **Residual risk:** paraphrased injection that the pattern does not know still reaches the VP and critic; both rejected every such attempt in the run.

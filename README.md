@@ -51,7 +51,7 @@ flowchart LR
     R -- no, retry ≤2 with the numbers --> X
     R -- yes, or still wrong → finding --> D{Ledger:<br/>seen before?}
     D -- duplicate --> SKIP[Skipped, never paid twice]
-    D -- new or revision --> V[35 validation rules<br/>stock, prices, dates,<br/>vendor risk, fraud]
+    D -- new or revision --> V[39 validation rules<br/>stock, prices, dates,<br/>vendor risk, fraud]
     V --> T{Route}
     T -- hard failure: reject --> S[Settle<br/>guardrail: no approval with a hard finding<br/>pay what is still owed, or log the rejection]
     T -- clean, < $10K: approve --> S
@@ -73,7 +73,7 @@ The full state graph is generated from the code: [docs/graph.mmd](docs/graph.mmd
 - **Two self-correction loops:**
   - When the totals don't reconcile, the extractor is shown the specific numbers and asked again.
   - The VP answers the critic's objections for up to two rounds.
-- **Rules in code, judgement in agents:** 35 rules with stable IDs ([docs/RULES.md](docs/RULES.md)).
+- **Rules in code, judgement in agents:** 39 rules with stable IDs ([docs/RULES.md](docs/RULES.md)).
   - Hard rules reject before any agent sees the invoice, and a guardrail makes approving with a hard finding impossible, for humans too.
   - Fraud signals and vendor-master changes always go to a person.
 - **Untrusted input:**
@@ -157,4 +157,4 @@ fixtures/golden/           recorded model answers for offline mode
 docs/                      brief, PRD, decisions, rules, live results, plan and tickets
 ```
 
-Checks: `scripts/check-all` (ruff, pyright strict, 351 tests including the offline eval), also run as a pre-commit hook.
+Checks: `scripts/check-all` (ruff, pyright strict, 391 tests including the offline eval), also run as a pre-commit hook.
