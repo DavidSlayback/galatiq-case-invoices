@@ -78,7 +78,7 @@
   "shipping": null,
   "total": "22562.80",
   "payment_terms": "Net 60",
-  "notes": "Tax rate stated on document as 0.07. Document total 22562.80 does not equal subtotal 21040.00 + tax 1472.80 (= 22512.80); difference 50.00. Total copied as stated on the document. Line amounts sum to the stated subtotal. No shipping stated.",
+  "notes": "Document states tax rate 0.07 (tax_rate field). Line amounts sum to 21040.00, matching the stated subtotal, and tax 1472.80 matches 7% of that subtotal. The stated total 22562.80 does NOT equal subtotal 21040.00 + tax 1472.80 (= 22512.80). The document's total is copied as written and the mismatch is flagged for AP review; no shipping charge is stated. Per-line annotations (Volume discount, Expedited, Replacement, Sample) are copied as written in the note field. Document is a JSON-formatted invoice with no free-text notes.",
   "remit_to": null,
   "provenance": {
     "vendor": "llm",

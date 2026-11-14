@@ -30,7 +30,7 @@
   "shipping": null,
   "total": "1890.00",
   "payment_terms": "Net 30",
-  "notes": "Tax rate shown on document as 0.08.",
+  "notes": "Tax rate stated as 0.08 on the document; tax amount stated as 140.00.",
   "remit_to": null,
   "provenance": {
     "vendor": "llm",

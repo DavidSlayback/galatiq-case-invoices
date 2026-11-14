@@ -38,7 +38,7 @@
   "shipping": null,
   "total": "5940.00",
   "payment_terms": "Net 30",
-  "notes": "Revised invoice - additional items added per PO amendment",
+  "notes": "Revised invoice - additional items added per PO amendment. Tax rate shown as 0.08.",
   "remit_to": null,
   "provenance": {
     "vendor": "llm",

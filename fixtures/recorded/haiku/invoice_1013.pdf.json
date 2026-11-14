@@ -78,7 +78,7 @@
   "shipping": null,
   "total": "22562.80",
   "payment_terms": "Net 60",
-  "notes": "Re-checked against the document. All eight line amounts match qty x unit price and sum to the stated subtotal of $21,040.00. Tax (7%) of $1,472.80 matches 7% of the subtotal. The document's Grand Total of $22,562.80 does not equal subtotal + tax ($22,512.80); a $50.00 difference is present on the document itself. Total kept exactly as written; flag for AP review. Tax label as written: \"Tax (7%)\". Line notes are from the Notes column. No shipping, currency, revision, or remittance details appear on the document.",
+  "notes": "Title reads \"Bulk Order Invoice\". Tax line labeled \"Tax (7%)\". Line amounts sum to the stated subtotal $21,040.00. Stated Grand Total $22,562.80 does not equal Subtotal + Tax ($21,040.00 + $1,472.80 = $22,512.80); the difference of $50.00 is not explained by any shipping or other charge on the document. Stated total kept as written.",
   "remit_to": null,
   "provenance": {
     "vendor": "llm",

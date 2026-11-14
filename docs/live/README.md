@@ -1,13 +1,17 @@
 # Live model results
 
-Every sample and adversarial invoice (27 files) was run against real models through the subscription CLIs (D31). The current results are from 2026-11-13, on the code with the review agents' tools (D48, D49). Scorecards: [Grok](scorecard-grok.md) · [Haiku](scorecard-haiku.md) · [every tool call](tool-calls.md). Each extraction is recorded under `fixtures/recorded/<backend>/`.
+Every sample and adversarial invoice (27 files) was run against real models through the subscription CLIs (D31). The current results are from 2026-11-14, on the code after the adversarial round (D52, D53). Scorecards: [Grok](scorecard-grok.md) · [Haiku](scorecard-haiku.md) · [every tool call](tool-calls.md). Each extraction is recorded under `fixtures/recorded/<backend>/`.
 
 | Backend | Result | Core fields vs goldens | Model calls | Tool calls by the VP and critic | Tokens | Time |
 |---|---|---|---|---|---|---|
-| Claude Haiku via Claude Code (`cli:claude:haiku`) | **27/27** | identical on all 27 | 50 | 7 in 6 review turns (`vendor_history` 4, `catalog_item` 3) | 58,189 | 5.3 min |
-| Grok 4.7 medium-fast via Cursor (`cli:cursor:grok-4.7-medium-fast`) | **27/27** | identical on all 27 | 42 | 2 in 4 review turns (`catalog_item` 2) | 593,856* | 10.6 min |
+| Claude Haiku via Claude Code (`cli:claude:haiku`) | **27/27** | identical on all 27 | 52 | 9 in 6 review turns (`vendor_history` 4, `catalog_item` 5) | 48,040 | 5.3 min |
+| Grok 4.7 medium-fast via Cursor (`cli:cursor:grok-4.7-medium-fast`) | **27/27** | identical on all 27 | 42 | 2 in 4 review turns (`catalog_item` 2) | 609,445* | 10.7 min |
 
 \* Cursor counts its own agent prompt in the input tokens. The Claude runs use our system prompt, with the CLI's own tools off.
+
+### 2026-11-14 re-run, after D52 and D53
+
+Both models scored 27/27 again, with every core field identical to the goldens, so the new rules (D53) and the review fixes (D52) changed no sample outcome on live extractions either. One thing to note: on 1001, Haiku's critic objected in round 0 that a `catalog_item` lookup had "returned no result", although it had called no tool in that turn. The VP then looked up the vendor and both items in round 1, and the critic agreed. The outcome was right, and the critic's claim about a tool result was not; the trace shows which tools ran.
 
 ### 2026-11-13 re-run: what changed
 

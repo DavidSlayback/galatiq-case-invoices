@@ -38,7 +38,7 @@
   "shipping": null,
   "total": "15525.00",
   "payment_terms": null,
-  "notes": "Tax line labelled \"Tax (6%)\". The document states Total 15525.00, which does not equal Subtotal 14750.00 plus Tax 885.00 (15635.00). The figures are kept as written on the document and were not corrected.",
+  "notes": "Document states Subtotal 14750.00, Tax (6%) 885.00, Total 15525.00. Re-checked against the document: line totals sum to 14750.00 and the stated subtotal and tax match, but subtotal plus tax is 15635.00, not the stated Total of 15525.00. The stated total is kept exactly as written; no shipping line on the document. Discrepancy flagged for review.",
   "remit_to": null,
   "provenance": {
     "vendor": "llm",
