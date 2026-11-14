@@ -125,7 +125,7 @@ Every decision, its reason, and whether David or the agent made it is in [docs/D
 - **No partial payment (D4).** An invoice with any bad line is rejected whole, and the notice names the line.
 - **Tiers (D7):** hard → reject; fraud or more than $50K → person; $10K–$50K or a soft flag → VP and critic; otherwise automatic.
 - **Vendor-master changes go to a person (D33).** Both live models approved the renamed vendor; who gets paid is not a model's call.
-- **People's decisions teach the registry (D50).** A reviewer who verified a rename or new bank details with the vendor can record it while approving. The change is logged with their note, and the vendor's next invoice is not flagged for it again. Look-alike names can never be learned this way.
+- **People's decisions teach the registry (D50).** A reviewer who verified a rename or new bank details with the vendor can record it while approving. The change is logged with their note, and the vendor's next invoice is not flagged for it again. Nothing is learned from an invoice that carries another fraud signal, such as a look-alike name (D52).
 - **The agents' reasoning is readable (D51).** The Process and History pages show each run as a conversation: the extractor reading the file, the code's checks, the VP's proposal and lookups, and the critic's verdict.
 - **Models (D31, D32):** any PydanticAI provider, or Grok and Claude through their CLIs on existing subscriptions, with offline replay as the fallback.
 
